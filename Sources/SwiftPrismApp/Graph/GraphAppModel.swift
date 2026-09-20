@@ -19,9 +19,23 @@ final class GraphAppModel: ObservableObject {
     @Published var detectedLanguages: [LanguageDetect.Result] = []
     @Published var searchQuery: String = ""
     @Published var lastFingerprint: GraphFingerprint?
+    /// Camera zoom for SceneKit graph (1 = default). ⌘+scroll / magnifier buttons.
+    @Published var graphZoom: CGFloat = 1.0
 
     private let watcher = ProjectWatcher()
     private weak var bookmarks: BookmarkStore?
+    private let zoomMin: CGFloat = 0.35
+    private let zoomMax: CGFloat = 4.0
+
+    func zoomIn() { setGraphZoom(graphZoom * 1.12) }
+    func zoomOut() { setGraphZoom(graphZoom / 1.12) }
+    func resetZoom() { setGraphZoom(1) }
+    func setGraphZoom(_ value: CGFloat) {
+        graphZoom = min(max(value, zoomMin), zoomMax)
+    }
+    func nudgeGraphZoom(deltaY: CGFloat) {
+        setGraphZoom(graphZoom * (deltaY > 0 ? 1.08 : 0.92))
+    }
 
     var detectedLanguageIds: [String] { detectedLanguages.map(\.languageId) }
 
@@ -96,6 +110,7 @@ final class GraphAppModel: ObservableObject {
         document = .empty
         selectedId = nil
         lastFingerprint = nil
+        graphZoom = 1
         do {
             let detected = try LanguageDetect.detectAll(projectRoot: url)
             detectedLanguages = detected

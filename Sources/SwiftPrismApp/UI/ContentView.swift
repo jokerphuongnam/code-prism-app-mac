@@ -9,10 +9,7 @@ struct ContentView: View {
     var body: some View {
         Group {
             switch model.screen {
-            case .welcome:
-                // Should rarely show inside a project window
-                BuildScreen()
-            case .build:
+            case .welcome, .build:
                 BuildScreen()
             case .graph:
                 graphWorkspace
@@ -32,8 +29,35 @@ struct ContentView: View {
                     Button("Build…") { model.backToBuild() }
                     Button("Rebuild") { model.analyze(fullBuild: true) }
                         .disabled(!model.canAnalyze)
+                    Divider()
+                    zoomToolbar
                 }
             }
+        }
+    }
+
+    private var zoomToolbar: some View {
+        HStack(spacing: 6) {
+            Button {
+                model.zoomOut()
+            } label: {
+                Image(systemName: "minus.magnifyingglass")
+            }
+            .help("Zoom out (⌘+scroll on graph)")
+
+            Text("\(Int((model.graphZoom * 100).rounded()))%")
+                .font(.caption.monospacedDigit())
+                .frame(minWidth: 36)
+
+            Button {
+                model.zoomIn()
+            } label: {
+                Image(systemName: "plus.magnifyingglass")
+            }
+            .help("Zoom in (⌘+scroll on graph)")
+
+            Button("Reset") { model.resetZoom() }
+                .disabled(abs(model.graphZoom - 1) < 0.01)
         }
     }
 
@@ -114,10 +138,13 @@ struct ContentView: View {
                 GraphSceneView(
                     document: model.document,
                     selectedId: model.selectedId,
-                    onSelect: { model.selectedId = $0 }
+                    zoom: model.graphZoom,
+                    onSelect: { model.selectedId = $0 },
+                    onZoomChange: { model.setGraphZoom($0) }
                 )
             }
         }
         .background(Color.black.opacity(0.92))
+        .clipped()
     }
 }
