@@ -3,7 +3,7 @@ import Foundation
 enum DemoPaths {
     /// Default sample project (clear View/Model graph).
     static var liteTrace: URL {
-        URL(fileURLWithPath: NSString("~/Documents/Code/iOS/LiteTrace").expandingTildeInPath)
+        URL(fileURLWithPath: ("~/Documents/Code/iOS/LiteTrace" as NSString).expandingTildeInPath)
     }
 
     static var supportRoot: URL {
@@ -17,6 +17,6 @@ enum DemoPaths {
 
     /// Sibling checkout of a `*-prism` backend repo (optional).
     static func siblingBackendRepo(_ name: String) -> URL {
-        URL(fileURLWithPath: NSString("~/Documents/Code/\(name)").expandingTildeInPath)
+        URL(fileURLWithPath: ("~/Documents/Code/\(name)" as NSString).expandingTildeInPath)
     }
 }
