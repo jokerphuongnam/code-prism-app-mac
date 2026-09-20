@@ -21,8 +21,13 @@ final class GraphAppModel: ObservableObject {
     @Published var lastFingerprint: GraphFingerprint?
 
     private let watcher = ProjectWatcher()
+    private weak var bookmarks: BookmarkStore?
 
     var detectedLanguageIds: [String] { detectedLanguages.map(\.languageId) }
+
+    func attachBookmarks(_ store: BookmarkStore) {
+        bookmarks = store
+    }
 
     var selectedBackends: [BackendPlugin] {
         let plugins = PluginDiscovery.discover()
@@ -67,7 +72,7 @@ final class GraphAppModel: ObservableObject {
         }
     }
 
-    // MARK: - Open
+    // MARK: - Open (within this project window)
 
     func openProject() {
         if let url = BackendRunner.pickProjectFolder(start: projectRoot ?? DemoPaths.liteTrace) {
@@ -84,7 +89,8 @@ final class GraphAppModel: ObservableObject {
         adoptProject(url)
     }
 
-    private func adoptProject(_ url: URL) {
+    /// Load / switch this window to a project folder (also bookmarks it).
+    func adoptProject(_ url: URL) {
         watcher.stop()
         projectRoot = url
         document = .empty
@@ -96,7 +102,7 @@ final class GraphAppModel: ObservableObject {
             let detail = detected.map { "\($0.languageId)(\($0.evidence))" }.joined(separator: "; ")
             status = "\(url.lastPathComponent) → \(languagesLabel) · \(detail)"
             screen = .build
-            // Prefetch fingerprint from existing cache if any
+            bookmarks?.remember(url: url, languages: detectedLanguageIds)
             if let doc = try? GraphLoader.loadMerged(projectRoot: url, languages: detectedLanguageIds) {
                 lastFingerprint = GraphFingerprint.from(doc)
             }
@@ -106,6 +112,7 @@ final class GraphAppModel: ObservableObject {
             document = .empty
             status = error.localizedDescription
             screen = .build
+            bookmarks?.remember(url: url, languages: [])
         }
     }
 

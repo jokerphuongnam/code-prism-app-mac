@@ -18,13 +18,16 @@
 		3E79D3DD3F0B062B8F96C690 /* InspectorPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AB1E4B73BB403BD5057C1B6 /* InspectorPanel.swift */; };
 		3EA750FE5D7F5A7F6969DBAD /* GraphAppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB82A81CF358FACC428C6B98 /* GraphAppModel.swift */; };
 		3F7B1F96D0A9C2D4DC2E8C81 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 586DED365D5B90A6FC7C5E12 /* ContentView.swift */; };
+		4695D2F08DEB6DBB2C5ED67D /* BookmarkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B678DE3AE90FBD9E3112035D /* BookmarkStore.swift */; };
 		4C08E69AC93FA6CBE123BD47 /* GraphFingerprint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CB967A8DD0656CA8D1E6D66 /* GraphFingerprint.swift */; };
+		4D6CA136441B885DB8641332 /* BookmarkWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A881A3A917ED69CEC7562384 /* BookmarkWindow.swift */; };
 		5172F38EBAE250A6DF331BB6 /* NodeGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC506CAC35E25F7753C7B4EF /* NodeGeometry.swift */; };
 		7877EDE264601AF6B6AF33DD /* ProjectWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1E51A6B3206273CF6AD5C6 /* ProjectWatcher.swift */; };
 		A25E74E98239985B771FB89F /* GraphSceneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9811EDADCFE502AB6AB5FF33 /* GraphSceneView.swift */; };
 		B6D3F54767878C1768867C85 /* BackendPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A25EA757E5BC1D7F8254277 /* BackendPlugin.swift */; };
 		BB6DB7E814D7E8F5EC1AD8DD /* SwiftPrismApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD060DA8EF71CF3C9D7F747 /* SwiftPrismApp.swift */; };
 		DD64433BD5BC119B6CAFF570 /* GraphModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B75145A6ACC033381925292A /* GraphModels.swift */; };
+		F728D33448CCBE0D2CECAE36 /* ProjectRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 558194B2E1A87C41D81D27DE /* ProjectRootView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,13 +38,16 @@
 		3A25EA757E5BC1D7F8254277 /* BackendPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendPlugin.swift; sourceTree = "<group>"; };
 		3AB1E4B73BB403BD5057C1B6 /* InspectorPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorPanel.swift; sourceTree = "<group>"; };
 		5300AFAD18F35ADFA6354A2C /* SwiftPrismApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SwiftPrismApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		558194B2E1A87C41D81D27DE /* ProjectRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRootView.swift; sourceTree = "<group>"; };
 		586DED365D5B90A6FC7C5E12 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		5B1E51A6B3206273CF6AD5C6 /* ProjectWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectWatcher.swift; sourceTree = "<group>"; };
 		7CB967A8DD0656CA8D1E6D66 /* GraphFingerprint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphFingerprint.swift; sourceTree = "<group>"; };
 		9811EDADCFE502AB6AB5FF33 /* GraphSceneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphSceneView.swift; sourceTree = "<group>"; };
 		98ACBFF84C553A88F52549DD /* DemoPaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoPaths.swift; sourceTree = "<group>"; };
+		A881A3A917ED69CEC7562384 /* BookmarkWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkWindow.swift; sourceTree = "<group>"; };
 		ABD060DA8EF71CF3C9D7F747 /* SwiftPrismApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftPrismApp.swift; sourceTree = "<group>"; };
 		B3407AE6380211C9A6593429 /* ForceLayout3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForceLayout3D.swift; sourceTree = "<group>"; };
+		B678DE3AE90FBD9E3112035D /* BookmarkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkStore.swift; sourceTree = "<group>"; };
 		B75145A6ACC033381925292A /* GraphModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphModels.swift; sourceTree = "<group>"; };
 		B9D736EB5F4A2AF442682D76 /* PluginDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginDiscovery.swift; sourceTree = "<group>"; };
 		CC506CAC35E25F7753C7B4EF /* NodeGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeGeometry.swift; sourceTree = "<group>"; };
@@ -86,6 +92,7 @@
 			isa = PBXGroup;
 			children = (
 				3A25EA757E5BC1D7F8254277 /* BackendPlugin.swift */,
+				B678DE3AE90FBD9E3112035D /* BookmarkStore.swift */,
 				98ACBFF84C553A88F52549DD /* DemoPaths.swift */,
 				0EABA41B0280E1CD8D0976EC /* LanguageDetect.swift */,
 				B9D736EB5F4A2AF442682D76 /* PluginDiscovery.swift */,
@@ -107,9 +114,11 @@
 		96894C0D696121146B983B94 /* UI */ = {
 			isa = PBXGroup;
 			children = (
+				A881A3A917ED69CEC7562384 /* BookmarkWindow.swift */,
 				139E4CB44D77DECA71659986 /* BuildScreen.swift */,
 				586DED365D5B90A6FC7C5E12 /* ContentView.swift */,
 				3AB1E4B73BB403BD5057C1B6 /* InspectorPanel.swift */,
+				558194B2E1A87C41D81D27DE /* ProjectRootView.swift */,
 				2689665BE7F6AAA3C68D986F /* WelcomeScreen.swift */,
 			);
 			path = UI;
@@ -190,6 +199,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				B6D3F54767878C1768867C85 /* BackendPlugin.swift in Sources */,
+				4695D2F08DEB6DBB2C5ED67D /* BookmarkStore.swift in Sources */,
+				4D6CA136441B885DB8641332 /* BookmarkWindow.swift in Sources */,
 				08F5AD5BF7A2523F614B4C74 /* BuildScreen.swift in Sources */,
 				3F7B1F96D0A9C2D4DC2E8C81 /* ContentView.swift in Sources */,
 				1FE4E68B2CA82C367960D88A /* DemoPaths.swift in Sources */,
@@ -203,6 +214,7 @@
 				0ACC7A9FB398E05711331608 /* LanguageDetect.swift in Sources */,
 				5172F38EBAE250A6DF331BB6 /* NodeGeometry.swift in Sources */,
 				36DC679891FDE6ED4CB86508 /* PluginDiscovery.swift in Sources */,
+				F728D33448CCBE0D2CECAE36 /* ProjectRootView.swift in Sources */,
 				7877EDE264601AF6B6AF33DD /* ProjectWatcher.swift in Sources */,
 				21EF0993105B6146F589FCCF /* SoTCache.swift in Sources */,
 				BB6DB7E814D7E8F5EC1AD8DD /* SwiftPrismApp.swift in Sources */,

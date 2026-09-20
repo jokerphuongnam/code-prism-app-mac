@@ -1,13 +1,17 @@
 import SwiftUI
 
+/// Project window content (build screen or graph). Owned by `ProjectRootView`.
 struct ContentView: View {
     @EnvironmentObject private var model: GraphAppModel
+    @EnvironmentObject private var bookmarks: BookmarkStore
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Group {
             switch model.screen {
             case .welcome:
-                WelcomeScreen()
+                // Should rarely show inside a project window
+                BuildScreen()
             case .build:
                 BuildScreen()
             case .graph:
@@ -16,9 +20,13 @@ struct ContentView: View {
         }
         .toolbar {
             ToolbarItemGroup {
-                if model.screen != .welcome {
-                    Button("Open…") { model.openProject() }
-                        .keyboardShortcut("o", modifiers: [.command])
+                Button("Projects") {
+                    openWindow(id: "bookmarks")
+                }
+                Button("Open Other…") {
+                    if let url = bookmarks.pickAndRemember() {
+                        openWindow(id: "project", value: url)
+                    }
                 }
                 if model.screen == .graph {
                     Button("Build…") { model.backToBuild() }
@@ -53,12 +61,6 @@ struct ContentView: View {
                     Text(model.languagesLabel)
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
-                }
-                if let root = model.projectRoot {
-                    Text(root.path)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
                 }
             }
             .padding(.horizontal, 12)
