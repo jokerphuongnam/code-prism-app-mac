@@ -21,7 +21,7 @@ This app **does not parse source**. It only:
 
 Local checkouts (many git repos, one folder):
 
-`~/Documents/Code/code-prism/backends/{swift,marlin,kotlin,js,rust,go}-prism`
+`~/Documents/Code/code-prism/backends/{swift,marlin,kotlin,js,rust,go,cpp,objective-c}-prism`
 
 | Backend | Repo | Languages |
 |---------|------|-----------|
@@ -31,6 +31,8 @@ Local checkouts (many git repos, one folder):
 | JS/TS | [js-prism](https://github.com/jokerphuongnam/js-prism) | JavaScript / TypeScript |
 | Rust | [rust-prism](https://github.com/jokerphuongnam/rust-prism) | Rust |
 | Go | [go-prism](https://github.com/jokerphuongnam/go-prism) | Go |
+| C/C++ | [cpp-prism](https://github.com/jokerphuongnam/cpp-prism) | C / C++ |
+| Objective-C | [objective-c-prism](https://github.com/jokerphuongnam/objective-c-prism) | ObjC / ObjC++ |
 
 Install binaries into `~/Library/Application Support/CodePrism/backends/<id>/` (or set `CODE_PRISM_BACKEND_<ID>`).
 

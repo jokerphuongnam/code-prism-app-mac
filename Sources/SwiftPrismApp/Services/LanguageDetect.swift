@@ -13,7 +13,7 @@ enum LanguageDetect {
         var errorDescription: String? {
             switch self {
             case .none(let root):
-                return "Không nhận diện được ngôn ngữ trong “\(root.lastPathComponent)”. Cần Swift / Marlin / Kotlin / JS·TS / Rust / Go (file nguồn hoặc manifest)."
+                return "Không nhận diện được ngôn ngữ trong “\(root.lastPathComponent)”. Cần Swift / Marlin / Kotlin / JS·TS / Rust / Go / C++ / Objective-C."
             }
         }
     }
@@ -28,6 +28,7 @@ enum LanguageDetect {
 
         var counts: [String: Int] = [
             "swift": 0, "marlin": 0, "kotlin": 0, "js": 0, "rust": 0, "go": 0,
+            "cpp": 0, "objc": 0,
         ]
         var markers: [String: [String]] = [:]
 
@@ -45,6 +46,8 @@ enum LanguageDetect {
             ("Application.marlin", "marlin"),
             ("package.json", "js"),
             ("tsconfig.json", "js"),
+            ("CMakeLists.txt", "cpp"),
+            ("compile_commands.json", "cpp"),
         ]
         for (name, lang) in markerFiles {
             let url = projectRoot.appendingPathComponent(name)
@@ -68,6 +71,11 @@ enum LanguageDetect {
             "js": "js", "jsx": "js", "ts": "js", "tsx": "js", "mjs": "js", "cjs": "js",
             "rs": "rust",
             "go": "go",
+            "c": "cpp", "cc": "cpp", "cpp": "cpp", "cxx": "cpp",
+            "hh": "cpp", "hpp": "cpp", "hxx": "cpp",
+            "m": "objc", "mm": "objc",
+            // .h: prefer objc if any .m/.mm seen later — counted as cpp by default; see post-pass
+            "h": "cpp",
         ]
 
         guard let enumerator = fm.enumerator(
@@ -78,14 +86,21 @@ enum LanguageDetect {
             throw DetectError.none(projectRoot)
         }
 
+        var headerCount = 0
         for case let url as URL in enumerator {
             if skip.contains(where: { url.pathComponents.contains($0) }) {
                 enumerator.skipDescendants()
                 continue
             }
             let ext = url.pathExtension.lowercased()
+            if ext == "h" { headerCount += 1 }
             guard let lang = extToLang[ext] else { continue }
             counts[lang, default: 0] += 1
+        }
+        // If ObjC sources exist, treat .h as ObjC-leaning bonus already via .m/.mm;
+        // if only .h+.cpp, cpp wins naturally.
+        if counts["objc", default: 0] > 0, headerCount > 0 {
+            counts["objc", default: 0] += min(headerCount, counts["objc", default: 0])
         }
 
         let ranked = counts.sorted { $0.value > $1.value }

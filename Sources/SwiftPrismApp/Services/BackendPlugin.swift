@@ -26,7 +26,13 @@ struct BackendPlugin: Identifiable, Equatable {
         if FileManager.default.isExecutableFile(atPath: installedURL.path) {
             return installedURL
         }
-        let repoName = (id == "js") ? "js-prism" : "\(id)-prism"
+        let repoName: String = {
+            switch id {
+            case "js": return "js-prism"
+            case "objc": return "objective-c-prism"
+            default: return "\(id)-prism"
+            }
+        }()
         let sibling = DemoPaths.siblingBackendRepo(repoName)
             .appendingPathComponent(buildArtifactRelative)
         if FileManager.default.isExecutableFile(atPath: sibling.path) { return sibling }
@@ -63,6 +69,12 @@ enum BackendCatalog {
         .init(id: "go", name: "Go", binaryName: "go-prism",
               buildArtifactRelative: "bin/go-prism",
               envOverrideKey: "CODE_PRISM_BACKEND_GO"),
+        .init(id: "cpp", name: "C/C++", binaryName: "cpp-prism",
+              buildArtifactRelative: "bin/cpp-prism",
+              envOverrideKey: "CODE_PRISM_BACKEND_CPP"),
+        .init(id: "objc", name: "Objective-C", binaryName: "objective-c-prism",
+              buildArtifactRelative: "bin/objective-c-prism",
+              envOverrideKey: "CODE_PRISM_BACKEND_OBJC"),
     ]
 
     static func plugin(id: String) -> BackendPlugin? { all.first { $0.id == id } }
