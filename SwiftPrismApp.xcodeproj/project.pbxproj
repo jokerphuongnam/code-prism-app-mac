@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		07204598D773BB5088272B3B /* ForceLayout3D.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3407AE6380211C9A6593429 /* ForceLayout3D.swift */; };
+		0ACC7A9FB398E05711331608 /* LanguageDetect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EABA41B0280E1CD8D0976EC /* LanguageDetect.swift */; };
 		18DA3EEAEAF06EC39084A45B /* GraphLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53173912AFA322EA7E7E8ED /* GraphLoader.swift */; };
 		1FE4E68B2CA82C367960D88A /* DemoPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98ACBFF84C553A88F52549DD /* DemoPaths.swift */; };
 		21EF0993105B6146F589FCCF /* SoTCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13BAE55D6FE59DF0B3E676EB /* SoTCache.swift */; };
@@ -22,6 +23,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		0EABA41B0280E1CD8D0976EC /* LanguageDetect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageDetect.swift; sourceTree = "<group>"; };
 		13BAE55D6FE59DF0B3E676EB /* SoTCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoTCache.swift; sourceTree = "<group>"; };
 		3A25EA757E5BC1D7F8254277 /* BackendPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendPlugin.swift; sourceTree = "<group>"; };
 		3AB1E4B73BB403BD5057C1B6 /* InspectorPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorPanel.swift; sourceTree = "<group>"; };
@@ -74,6 +76,7 @@
 			children = (
 				3A25EA757E5BC1D7F8254277 /* BackendPlugin.swift */,
 				98ACBFF84C553A88F52549DD /* DemoPaths.swift */,
+				0EABA41B0280E1CD8D0976EC /* LanguageDetect.swift */,
 				13BAE55D6FE59DF0B3E676EB /* SoTCache.swift */,
 			);
 			path = Services;
@@ -180,6 +183,7 @@
 				DD64433BD5BC119B6CAFF570 /* GraphModels.swift in Sources */,
 				A25E74E98239985B771FB89F /* GraphSceneView.swift in Sources */,
 				3E79D3DD3F0B062B8F96C690 /* InspectorPanel.swift in Sources */,
+				0ACC7A9FB398E05711331608 /* LanguageDetect.swift in Sources */,
 				5172F38EBAE250A6DF331BB6 /* NodeGeometry.swift in Sources */,
 				21EF0993105B6146F589FCCF /* SoTCache.swift in Sources */,
 				BB6DB7E814D7E8F5EC1AD8DD /* SwiftPrismApp.swift in Sources */,

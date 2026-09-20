@@ -8,11 +8,14 @@ final class GraphAppModel: ObservableObject {
     @Published var selectedId: String?
     @Published var status: String = "Open a project (or LiteTrace demo)."
     @Published var isBusy = false
-    @Published var selectedBackendId: String = "swift"
+    /// Auto-detected language id (`swift`, `js`, …). `nil` if unknown / error.
+    @Published var detectedLanguageId: String?
+    @Published var detectEvidence: String = ""
     @Published var searchQuery: String = ""
 
-    var selectedBackend: BackendPlugin {
-        BackendCatalog.plugin(id: selectedBackendId) ?? BackendCatalog.all[0]
+    var selectedBackend: BackendPlugin? {
+        guard let detectedLanguageId else { return nil }
+        return BackendCatalog.plugin(id: detectedLanguageId)
     }
 
     var selectedNode: GraphNode? {
@@ -28,11 +31,13 @@ final class GraphAppModel: ObservableObject {
         }
     }
 
+    var canAnalyze: Bool {
+        projectRoot != nil && selectedBackend != nil && !isBusy
+    }
+
     func openProject() {
         if let url = BackendRunner.pickProjectFolder(start: DemoPaths.liteTrace) {
-            projectRoot = url
-            status = "Opened \(url.lastPathComponent). Install/run a backend to refresh SoT, or Reload if SoT exists."
-            tryLoadSoT()
+            adoptProject(url)
         }
     }
 
@@ -42,14 +47,34 @@ final class GraphAppModel: ObservableObject {
             status = "LiteTrace not found at \(url.path)"
             return
         }
+        adoptProject(url)
+    }
+
+    /// Set project root, auto-detect language, load cache if any.
+    private func adoptProject(_ url: URL) {
         projectRoot = url
-        selectedBackendId = "swift"
-        status = "Demo: LiteTrace (Swift backend)"
-        tryLoadSoT()
+        document = .empty
+        selectedId = nil
+        do {
+            let detected = try LanguageDetect.detect(projectRoot: url)
+            detectedLanguageId = detected.languageId
+            detectEvidence = detected.evidence
+            let langName = selectedBackend?.name ?? detected.languageId
+            status = "\(url.lastPathComponent) → \(langName) (\(detected.evidence))"
+            tryLoadSoT()
+        } catch {
+            detectedLanguageId = nil
+            detectEvidence = ""
+            document = .empty
+            status = error.localizedDescription
+        }
     }
 
     func installSelectedBackend() {
-        let plugin = selectedBackend
+        guard let plugin = selectedBackend else {
+            status = "Chưa nhận diện được ngôn ngữ — không cài được backend."
+            return
+        }
         isBusy = true
         status = "Installing \(plugin.name) backend…"
         DispatchQueue.global(qos: .userInitiated).async {
@@ -74,7 +99,10 @@ final class GraphAppModel: ObservableObject {
             status = BackendError.noProject.localizedDescription
             return
         }
-        let plugin = selectedBackend
+        guard let plugin = selectedBackend else {
+            status = "Không nhận diện được ngôn ngữ cho project này — Analyze bị hủy."
+            return
+        }
         isBusy = true
         status = "Running \(plugin.name) backend → ~/Library/Caches/code-prism/…"
         DispatchQueue.global(qos: .userInitiated).async {
@@ -98,14 +126,23 @@ final class GraphAppModel: ObservableObject {
 
     func tryLoadSoT() {
         guard let root = projectRoot else { return }
+        guard let lang = detectedLanguageId else {
+            document = .empty
+            return
+        }
         do {
-            let doc = try GraphLoader.load(projectRoot: root, language: selectedBackendId)
+            let doc = try GraphLoader.load(projectRoot: root, language: lang)
             document = doc
             if selectedId == nil { selectedId = doc.nodes.first?.id }
-            status = "Loaded SoT from cache: \(doc.nodes.count) nodes, \(doc.links.count) links"
+            status = "Loaded SoT (\(lang)): \(doc.nodes.count) nodes, \(doc.links.count) links"
         } catch {
             document = .empty
-            status = error.localizedDescription
+            // Keep detect status; append load hint
+            if let backend = selectedBackend {
+                status = "\(root.lastPathComponent) → \(backend.name) (\(detectEvidence)). Chưa có cache — bấm Analyze."
+            } else {
+                status = error.localizedDescription
+            }
         }
     }
 }

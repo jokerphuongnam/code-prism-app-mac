@@ -20,19 +20,21 @@ struct ContentView: View {
                 Button("Open…") { model.openProject() }
                 Button("LiteTrace demo") { model.openLiteTraceDemo() }
                 Divider()
-                Picker("Backend", selection: $model.selectedBackendId) {
-                    ForEach(BackendCatalog.all) { b in
-                        Text(b.name).tag(b.id)
+                if let backend = model.selectedBackend {
+                    Text(backend.name)
+                        .foregroundStyle(.secondary)
+                        .help(model.detectEvidence)
+                    Button(backend.isInstalled ? "Reinstall backend" : "Install backend") {
+                        model.installSelectedBackend()
                     }
-                }
-                .frame(width: 120)
-                Button(model.selectedBackend.isInstalled ? "Reinstall backend" : "Install backend") {
-                    model.installSelectedBackend()
+                } else if model.projectRoot != nil {
+                    Text("Unknown language")
+                        .foregroundStyle(.red)
                 }
                 Button("Analyze → SoT") { model.analyze() }
-                    .disabled(model.projectRoot == nil || model.isBusy)
+                    .disabled(!model.canAnalyze)
                 Button("Reload SoT") { model.tryLoadSoT() }
-                    .disabled(model.projectRoot == nil || model.isBusy)
+                    .disabled(model.projectRoot == nil || model.selectedBackend == nil || model.isBusy)
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -40,7 +42,7 @@ struct ContentView: View {
                 if model.isBusy { ProgressView().controlSize(.small) }
                 Text(model.status)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(model.selectedBackend == nil && model.projectRoot != nil ? .red : .secondary)
                     .lineLimit(2)
                 Spacer()
                 if let root = model.projectRoot {
@@ -84,11 +86,17 @@ struct ContentView: View {
 
     private var graphPane: some View {
         ZStack {
-            if model.document.nodes.isEmpty {
+            if model.projectRoot != nil, model.selectedBackend == nil {
+                ContentUnavailableView(
+                    "Không nhận diện ngôn ngữ",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text(model.status)
+                )
+            } else if model.document.nodes.isEmpty {
                 ContentUnavailableView(
                     "No graph loaded",
                     systemImage: "point.3.connected.trianglepath.dotted",
-                    description: Text("Open a project, pick a backend, Analyze. SoT is stored in ~/Library/Caches/code-prism/ (not inside the project).")
+                    description: Text("Open a project (language is detected automatically), then Analyze. SoT → ~/Library/Caches/code-prism/.")
                 )
             } else {
                 GraphSceneView(
