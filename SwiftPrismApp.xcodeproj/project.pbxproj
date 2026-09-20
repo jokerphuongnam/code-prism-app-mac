@@ -1,0 +1,377 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		07204598D773BB5088272B3B /* ForceLayout3D.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3407AE6380211C9A6593429 /* ForceLayout3D.swift */; };
+		18DA3EEAEAF06EC39084A45B /* GraphLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53173912AFA322EA7E7E8ED /* GraphLoader.swift */; };
+		1FE4E68B2CA82C367960D88A /* DemoPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98ACBFF84C553A88F52549DD /* DemoPaths.swift */; };
+		3E79D3DD3F0B062B8F96C690 /* InspectorPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AB1E4B73BB403BD5057C1B6 /* InspectorPanel.swift */; };
+		3EA750FE5D7F5A7F6969DBAD /* GraphAppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB82A81CF358FACC428C6B98 /* GraphAppModel.swift */; };
+		3F7B1F96D0A9C2D4DC2E8C81 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 586DED365D5B90A6FC7C5E12 /* ContentView.swift */; };
+		5172F38EBAE250A6DF331BB6 /* NodeGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC506CAC35E25F7753C7B4EF /* NodeGeometry.swift */; };
+		A25E74E98239985B771FB89F /* GraphSceneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9811EDADCFE502AB6AB5FF33 /* GraphSceneView.swift */; };
+		B6D3F54767878C1768867C85 /* BackendPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A25EA757E5BC1D7F8254277 /* BackendPlugin.swift */; };
+		BB6DB7E814D7E8F5EC1AD8DD /* SwiftPrismApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD060DA8EF71CF3C9D7F747 /* SwiftPrismApp.swift */; };
+		DD64433BD5BC119B6CAFF570 /* GraphModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B75145A6ACC033381925292A /* GraphModels.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		3A25EA757E5BC1D7F8254277 /* BackendPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendPlugin.swift; sourceTree = "<group>"; };
+		3AB1E4B73BB403BD5057C1B6 /* InspectorPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorPanel.swift; sourceTree = "<group>"; };
+		5300AFAD18F35ADFA6354A2C /* SwiftPrismApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SwiftPrismApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		586DED365D5B90A6FC7C5E12 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		9811EDADCFE502AB6AB5FF33 /* GraphSceneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphSceneView.swift; sourceTree = "<group>"; };
+		98ACBFF84C553A88F52549DD /* DemoPaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoPaths.swift; sourceTree = "<group>"; };
+		ABD060DA8EF71CF3C9D7F747 /* SwiftPrismApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftPrismApp.swift; sourceTree = "<group>"; };
+		B3407AE6380211C9A6593429 /* ForceLayout3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForceLayout3D.swift; sourceTree = "<group>"; };
+		B75145A6ACC033381925292A /* GraphModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphModels.swift; sourceTree = "<group>"; };
+		CC506CAC35E25F7753C7B4EF /* NodeGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeGeometry.swift; sourceTree = "<group>"; };
+		F53173912AFA322EA7E7E8ED /* GraphLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphLoader.swift; sourceTree = "<group>"; };
+		FB82A81CF358FACC428C6B98 /* GraphAppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphAppModel.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		3A76C951A3F8026B7E4EA105 /* Graph */ = {
+			isa = PBXGroup;
+			children = (
+				B3407AE6380211C9A6593429 /* ForceLayout3D.swift */,
+				FB82A81CF358FACC428C6B98 /* GraphAppModel.swift */,
+				F53173912AFA322EA7E7E8ED /* GraphLoader.swift */,
+				B75145A6ACC033381925292A /* GraphModels.swift */,
+			);
+			path = Graph;
+			sourceTree = "<group>";
+		};
+		3C115D56E3E42F35030FE910 /* SwiftPrismApp */ = {
+			isa = PBXGroup;
+			children = (
+				ABD060DA8EF71CF3C9D7F747 /* SwiftPrismApp.swift */,
+				3A76C951A3F8026B7E4EA105 /* Graph */,
+				77377B792FA3E0044D85296C /* Scene */,
+				73E9D979960C6ECD5556CE18 /* Services */,
+				96894C0D696121146B983B94 /* UI */,
+			);
+			path = SwiftPrismApp;
+			sourceTree = "<group>";
+		};
+		6E489C6F934254967E25DB15 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				3C115D56E3E42F35030FE910 /* SwiftPrismApp */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		73E9D979960C6ECD5556CE18 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				3A25EA757E5BC1D7F8254277 /* BackendPlugin.swift */,
+				98ACBFF84C553A88F52549DD /* DemoPaths.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		77377B792FA3E0044D85296C /* Scene */ = {
+			isa = PBXGroup;
+			children = (
+				9811EDADCFE502AB6AB5FF33 /* GraphSceneView.swift */,
+				CC506CAC35E25F7753C7B4EF /* NodeGeometry.swift */,
+			);
+			path = Scene;
+			sourceTree = "<group>";
+		};
+		96894C0D696121146B983B94 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				586DED365D5B90A6FC7C5E12 /* ContentView.swift */,
+				3AB1E4B73BB403BD5057C1B6 /* InspectorPanel.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		CAF6F751A5A436DCB3AFE3F2 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				5300AFAD18F35ADFA6354A2C /* SwiftPrismApp.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		E8C681DBA598C7ED2A636172 = {
+			isa = PBXGroup;
+			children = (
+				6E489C6F934254967E25DB15 /* Sources */,
+				CAF6F751A5A436DCB3AFE3F2 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A8F5A2C48104238021FCCFD3 /* SwiftPrismApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3DEEA11963F18843D7CA297C /* Build configuration list for PBXNativeTarget "SwiftPrismApp" */;
+			buildPhases = (
+				590A452EDDF5832B0CC199BD /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SwiftPrismApp;
+			packageProductDependencies = (
+			);
+			productName = SwiftPrismApp;
+			productReference = 5300AFAD18F35ADFA6354A2C /* SwiftPrismApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		7956CDC9DBC12A77156E214E /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					A8F5A2C48104238021FCCFD3 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 0909379036CA94E51942CC8E /* Build configuration list for PBXProject "SwiftPrismApp" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = E8C681DBA598C7ED2A636172;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = CAF6F751A5A436DCB3AFE3F2 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A8F5A2C48104238021FCCFD3 /* SwiftPrismApp */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		590A452EDDF5832B0CC199BD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B6D3F54767878C1768867C85 /* BackendPlugin.swift in Sources */,
+				3F7B1F96D0A9C2D4DC2E8C81 /* ContentView.swift in Sources */,
+				1FE4E68B2CA82C367960D88A /* DemoPaths.swift in Sources */,
+				07204598D773BB5088272B3B /* ForceLayout3D.swift in Sources */,
+				3EA750FE5D7F5A7F6969DBAD /* GraphAppModel.swift in Sources */,
+				18DA3EEAEAF06EC39084A45B /* GraphLoader.swift in Sources */,
+				DD64433BD5BC119B6CAFF570 /* GraphModels.swift in Sources */,
+				A25E74E98239985B771FB89F /* GraphSceneView.swift in Sources */,
+				3E79D3DD3F0B062B8F96C690 /* InspectorPanel.swift in Sources */,
+				5172F38EBAE250A6DF331BB6 /* NodeGeometry.swift in Sources */,
+				BB6DB7E814D7E8F5EC1AD8DD /* SwiftPrismApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		36D2C33477031BD72E1C64B0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SwiftPrism;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.swiftprism.viewer;
+				PRODUCT_NAME = SwiftPrism;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		B6A6A2124C4978226135DBE4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.10;
+			};
+			name = Debug;
+		};
+		CE0034324722F726521A403A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SwiftPrism;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.swiftprism.viewer;
+				PRODUCT_NAME = SwiftPrism;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		DA5254A96D4B850E083F85ED /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.10;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0909379036CA94E51942CC8E /* Build configuration list for PBXProject "SwiftPrismApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B6A6A2124C4978226135DBE4 /* Debug */,
+				DA5254A96D4B850E083F85ED /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		3DEEA11963F18843D7CA297C /* Build configuration list for PBXNativeTarget "SwiftPrismApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CE0034324722F726521A403A /* Debug */,
+				36D2C33477031BD72E1C64B0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 7956CDC9DBC12A77156E214E /* Project object */;
+}
