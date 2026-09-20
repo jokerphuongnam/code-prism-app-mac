@@ -150,10 +150,10 @@ enum BackendRunner {
 
     /// Run backend main → write SoT under `.codeprism/`.
     static func analyze(projectRoot: URL, plugin: BackendPlugin) throws -> URL {
-        let bin = plugin.resolvedBinary ?? {
-            try? install(plugin)
-            return plugin.installedURL
-        }()
+        var bin = plugin.resolvedBinary
+        if bin == nil {
+            bin = try install(plugin)
+        }
         guard let bin, FileManager.default.isExecutableFile(atPath: bin.path) else {
             throw BackendError.analyzerNotFound(plugin.id)
         }
