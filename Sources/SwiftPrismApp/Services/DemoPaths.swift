@@ -15,8 +15,13 @@ enum DemoPaths {
         supportRoot.appendingPathComponent("backends", isDirectory: true)
     }
 
-    /// Sibling checkout of a `*-prism` backend repo (optional).
+    /// Backend checkouts live under `~/Documents/Code/code-prism/backends/<repo>`.
+    static var backendsCheckoutRoot: URL {
+        URL(fileURLWithPath: ("~/Documents/Code/code-prism/backends" as NSString).expandingTildeInPath)
+    }
+
+    /// Resolve a `*-prism` backend repo folder (e.g. `swift-prism`, `js-prism`).
     static func siblingBackendRepo(_ name: String) -> URL {
-        URL(fileURLWithPath: ("~/Documents/Code/\(name)" as NSString).expandingTildeInPath)
+        backendsCheckoutRoot.appendingPathComponent(name, isDirectory: true)
     }
 }

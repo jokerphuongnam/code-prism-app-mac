@@ -27,14 +27,15 @@ struct BackendPlugin: Identifiable, Equatable {
         if FileManager.default.isExecutableFile(atPath: installedURL.path) {
             return installedURL
         }
-        let sibling = DemoPaths.siblingBackendRepo(id == "swift" ? "swift-prism" : "\(id)-prism")
+        let repoName = (id == "js") ? "js-prism" : "\(id)-prism"
+        let sibling = DemoPaths.siblingBackendRepo(repoName)
             .appendingPathComponent(buildArtifactRelative)
         if FileManager.default.isExecutableFile(atPath: sibling.path) { return sibling }
-        // swift special-case paths
+        // swift special-case paths after repo split
         if id == "swift" {
             let alts = [
-                DemoPaths.siblingBackendRepo("swift-prism").appendingPathComponent("extension/bin/swift-prism-analyzer"),
                 DemoPaths.siblingBackendRepo("swift-prism").appendingPathComponent("core/.build/release/swift-prism-analyzer"),
+                DemoPaths.siblingBackendRepo("swift-prism").appendingPathComponent("bin/swift-prism-analyzer"),
             ]
             return alts.first { FileManager.default.isExecutableFile(atPath: $0.path) }
         }
@@ -71,6 +72,20 @@ enum BackendCatalog {
             binaryName: "js-prism",
             buildArtifactRelative: "bin/js-prism",
             envOverrideKey: "CODE_PRISM_BACKEND_JS"
+        ),
+        BackendPlugin(
+            id: "rust",
+            name: "Rust",
+            binaryName: "rust-prism",
+            buildArtifactRelative: "bin/rust-prism",
+            envOverrideKey: "CODE_PRISM_BACKEND_RUST"
+        ),
+        BackendPlugin(
+            id: "go",
+            name: "Go",
+            binaryName: "go-prism",
+            buildArtifactRelative: "bin/go-prism",
+            envOverrideKey: "CODE_PRISM_BACKEND_GO"
         ),
     ]
 
@@ -245,7 +260,7 @@ enum BackendRunner {
     private static func importSQLite(from json: URL, sotDir: URL) throws -> URL {
         let db = sotDir.appendingPathComponent(SoTPaths.sqliteName)
         let helpers = [
-            DemoPaths.siblingBackendRepo("mcp-prism").appendingPathComponent("dist/graph-db.js"),
+            URL(fileURLWithPath: ("~/Documents/Code/mcp-prism/dist/graph-db.js" as NSString).expandingTildeInPath),
             DemoPaths.siblingBackendRepo("swift-prism").appendingPathComponent("mcp-server/dist/graph-db.js"),
         ]
         guard let helper = helpers.first(where: { FileManager.default.fileExists(atPath: $0.path) }) else {
