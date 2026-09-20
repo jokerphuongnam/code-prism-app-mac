@@ -9,74 +9,70 @@ enum LanguageDetect {
     }
 
     enum DetectError: LocalizedError {
+        case noPlugins
         case none(URL)
 
         var errorDescription: String? {
             switch self {
+            case .noPlugins:
+                return "Không tìm thấy backend plugin nào trên máy. Clone vào ~/Documents/Code/code-prism/backends/*-prism hoặc Install backend."
             case .none(let root):
-                return "Không nhận diện được ngôn ngữ trong “\(root.lastPathComponent)”. Cần Swift / Marlin / Kotlin / JS·TS / Rust / Go / C++ / Objective-C."
+                let plugins = PluginDiscovery.discover()
+                let langs = plugins.map(\.name).joined(separator: " / ")
+                return "Không nhận diện được ngôn ngữ trong “\(root.lastPathComponent)”. Plugin hiện có: \(langs.isEmpty ? "(không có)" : langs)."
             }
         }
     }
 
-    /// All languages present in the project (score > 0), strongest first.
-    static func detectAll(projectRoot: URL) throws -> [Result] {
+    /// Detect languages using **discovered plugins** only (extensions + markers from manifests).
+    static func detectAll(projectRoot: URL, plugins: [DiscoveredPlugin]? = nil) throws -> [Result] {
+        let plugins = plugins ?? PluginDiscovery.discover()
+        guard !plugins.isEmpty else { throw DetectError.noPlugins }
+
         let fm = FileManager.default
         let skip = Set([
             ".build", "DerivedData", "Pods", "node_modules", ".git", "Carthage",
             "dist", "target", ".next", ".turbo", "__pycache__", ".venv", "vendor",
         ])
 
-        var counts: [String: Int] = [
-            "swift": 0, "marlin": 0, "kotlin": 0, "js": 0, "rust": 0, "go": 0,
-            "cpp": 0, "objc": 0,
-        ]
-        var markers: [String: [String]] = [:]
-        var fileCounts: [String: Int] = [:]
+        var counts: [String: Int] = Dictionary(uniqueKeysWithValues: plugins.map { ($0.id, 0) })
+        var fileCounts: [String: Int] = Dictionary(uniqueKeysWithValues: plugins.map { ($0.id, 0) })
+        var markersHit: [String: [String]] = [:]
 
-        func addMarker(_ lang: String, _ note: String) {
-            markers[lang, default: []].append(note)
-        }
-
-        let markerFiles: [(String, String, Int)] = [
-            ("Package.swift", "swift", 50),
-            ("go.mod", "go", 50),
-            ("Cargo.toml", "rust", 50),
-            ("build.gradle.kts", "kotlin", 50),
-            ("build.gradle", "kotlin", 40),
-            ("Application.marlin", "marlin", 50),
-            ("package.json", "js", 40),
-            ("tsconfig.json", "js", 45),
-            ("CMakeLists.txt", "cpp", 50),
-            ("compile_commands.json", "cpp", 45),
-        ]
-        for (name, lang, bonus) in markerFiles {
-            let url = projectRoot.appendingPathComponent(name)
-            if fm.fileExists(atPath: url.path) {
-                counts[lang, default: 0] += bonus
-                addMarker(lang, name)
+        // Markers
+        for plugin in plugins {
+            for marker in plugin.markers {
+                let url = projectRoot.appendingPathComponent(marker)
+                if fm.fileExists(atPath: url.path) {
+                    counts[plugin.id, default: 0] += 50
+                    markersHit[plugin.id, default: []].append(marker)
+                }
             }
-        }
-        if let items = try? fm.contentsOfDirectory(atPath: projectRoot.path) {
-            if items.contains(where: { $0.hasSuffix(".xcodeproj") || $0.hasSuffix(".xcworkspace") }) {
-                counts["swift", default: 0] += 40
-                addMarker("swift", "*.xcodeproj/xcworkspace")
+            // Extra: xcodeproj for plugins that include "swift"
+            if plugin.extensions.contains("swift"),
+               let items = try? fm.contentsOfDirectory(atPath: projectRoot.path),
+               items.contains(where: { $0.hasSuffix(".xcodeproj") || $0.hasSuffix(".xcworkspace") }) {
+                counts[plugin.id, default: 0] += 40
+                markersHit[plugin.id, default: []].append("*.xcodeproj")
             }
         }
 
-        let extToLang: [String: String] = [
-            "swift": "swift",
-            "marlin": "marlin",
-            "kt": "kotlin", "kts": "kotlin",
-            "js": "js", "jsx": "js", "ts": "js", "tsx": "js", "mjs": "js", "cjs": "js",
-            "rs": "rust",
-            "go": "go",
-            "c": "cpp", "cc": "cpp", "cpp": "cpp", "cxx": "cpp",
-            "hh": "cpp", "hpp": "cpp", "hxx": "cpp",
-            "m": "objc", "mm": "objc",
-            "h": "cpp",
-        ]
+        let extToLang: [String: String] = {
+            var map: [String: String] = [:]
+            for plugin in plugins {
+                for ext in plugin.extensions {
+                    // First plugin wins for shared exts like .h — prefer more specific later by score
+                    if map[ext] == nil { map[ext] = plugin.id }
+                }
+            }
+            // Prefer objc for .h when objc plugin exists and we'll boost via .m/.mm
+            if plugins.contains(where: { $0.id == "objc" }) {
+                // keep .h as cpp if both claim it; objc boost handles .m/.mm projects
+            }
+            return map
+        }()
 
+        // If both cpp and objc claim "h", map h → cpp by default; objc gets boost from m/mm
         var headerCount = 0
         guard let enumerator = fm.enumerator(
             at: projectRoot,
@@ -101,25 +97,23 @@ enum LanguageDetect {
             counts["objc", default: 0] += min(headerCount, counts["objc", default: 0])
         }
 
-        // A language “exists” if it has source files OR a strong marker (≥ 40).
         var results: [Result] = []
-        for (lang, score) in counts where score > 0 {
-            let files = fileCounts[lang, default: 0]
-            let hasMarker = !(markers[lang] ?? []).isEmpty
-            // Skip marker-only noise with zero sources except strong project roots
-            if files == 0, !hasMarker { continue }
+        for plugin in plugins {
+            let score = counts[plugin.id, default: 0]
+            if score <= 0 { continue }
+            let files = fileCounts[plugin.id, default: 0]
+            let notes = markersHit[plugin.id] ?? []
+            if files == 0, notes.isEmpty { continue }
             if files == 0, score < 40 { continue }
-
-            let evidenceParts = markers[lang] ?? []
             let evidence: String
-            if !evidenceParts.isEmpty {
-                evidence = evidenceParts.joined(separator: ", ") + (files > 0 ? " · \(files) files" : "")
+            if !notes.isEmpty {
+                evidence = notes.joined(separator: ", ") + (files > 0 ? " · \(files) files" : "")
             } else {
                 evidence = "\(files) source files"
             }
             results.append(
                 Result(
-                    languageId: lang,
+                    languageId: plugin.id,
                     evidence: evidence,
                     sourceFileCount: files,
                     score: score
@@ -130,10 +124,5 @@ enum LanguageDetect {
         results.sort { $0.score > $1.score }
         guard !results.isEmpty else { throw DetectError.none(projectRoot) }
         return results
-    }
-
-    /// Primary language only (strongest score).
-    static func detect(projectRoot: URL) throws -> Result {
-        try detectAll(projectRoot: projectRoot)[0]
     }
 }

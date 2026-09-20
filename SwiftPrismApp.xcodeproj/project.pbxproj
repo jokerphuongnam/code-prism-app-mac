@@ -12,6 +12,7 @@
 		18DA3EEAEAF06EC39084A45B /* GraphLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53173912AFA322EA7E7E8ED /* GraphLoader.swift */; };
 		1FE4E68B2CA82C367960D88A /* DemoPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98ACBFF84C553A88F52549DD /* DemoPaths.swift */; };
 		21EF0993105B6146F589FCCF /* SoTCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13BAE55D6FE59DF0B3E676EB /* SoTCache.swift */; };
+		36DC679891FDE6ED4CB86508 /* PluginDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9D736EB5F4A2AF442682D76 /* PluginDiscovery.swift */; };
 		3E79D3DD3F0B062B8F96C690 /* InspectorPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AB1E4B73BB403BD5057C1B6 /* InspectorPanel.swift */; };
 		3EA750FE5D7F5A7F6969DBAD /* GraphAppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB82A81CF358FACC428C6B98 /* GraphAppModel.swift */; };
 		3F7B1F96D0A9C2D4DC2E8C81 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 586DED365D5B90A6FC7C5E12 /* ContentView.swift */; };
@@ -34,6 +35,7 @@
 		ABD060DA8EF71CF3C9D7F747 /* SwiftPrismApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftPrismApp.swift; sourceTree = "<group>"; };
 		B3407AE6380211C9A6593429 /* ForceLayout3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForceLayout3D.swift; sourceTree = "<group>"; };
 		B75145A6ACC033381925292A /* GraphModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphModels.swift; sourceTree = "<group>"; };
+		B9D736EB5F4A2AF442682D76 /* PluginDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginDiscovery.swift; sourceTree = "<group>"; };
 		CC506CAC35E25F7753C7B4EF /* NodeGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeGeometry.swift; sourceTree = "<group>"; };
 		F53173912AFA322EA7E7E8ED /* GraphLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphLoader.swift; sourceTree = "<group>"; };
 		FB82A81CF358FACC428C6B98 /* GraphAppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphAppModel.swift; sourceTree = "<group>"; };
@@ -77,6 +79,7 @@
 				3A25EA757E5BC1D7F8254277 /* BackendPlugin.swift */,
 				98ACBFF84C553A88F52549DD /* DemoPaths.swift */,
 				0EABA41B0280E1CD8D0976EC /* LanguageDetect.swift */,
+				B9D736EB5F4A2AF442682D76 /* PluginDiscovery.swift */,
 				13BAE55D6FE59DF0B3E676EB /* SoTCache.swift */,
 			);
 			path = Services;
@@ -185,6 +188,7 @@
 				3E79D3DD3F0B062B8F96C690 /* InspectorPanel.swift in Sources */,
 				0ACC7A9FB398E05711331608 /* LanguageDetect.swift in Sources */,
 				5172F38EBAE250A6DF331BB6 /* NodeGeometry.swift in Sources */,
+				36DC679891FDE6ED4CB86508 /* PluginDiscovery.swift in Sources */,
 				21EF0993105B6146F589FCCF /* SoTCache.swift in Sources */,
 				BB6DB7E814D7E8F5EC1AD8DD /* SwiftPrismApp.swift in Sources */,
 			);

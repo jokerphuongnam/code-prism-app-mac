@@ -1,83 +1,16 @@
 import AppKit
 import Foundation
 
-/// Language backend plugin = CLI whose `main` writes SoT into the system cache.
-struct BackendPlugin: Identifiable, Equatable {
-    var id: String
-    var name: String
-    var binaryName: String
-    var buildArtifactRelative: String
-    var envOverrideKey: String
-
-    var installedURL: URL {
-        DemoPaths.backendsRoot.appendingPathComponent("\(id)/\(binaryName)")
-    }
-
-    var isInstalled: Bool {
-        FileManager.default.isExecutableFile(atPath: installedURL.path)
-            || ProcessInfo.processInfo.environment[envOverrideKey] != nil
-    }
-
-    var resolvedBinary: URL? {
-        if let env = ProcessInfo.processInfo.environment[envOverrideKey], !env.isEmpty {
-            let u = URL(fileURLWithPath: env)
-            if FileManager.default.isExecutableFile(atPath: u.path) { return u }
-        }
-        if FileManager.default.isExecutableFile(atPath: installedURL.path) {
-            return installedURL
-        }
-        let repoName: String = {
-            switch id {
-            case "js": return "js-prism"
-            case "objc": return "objective-c-prism"
-            default: return "\(id)-prism"
-            }
-        }()
-        let sibling = DemoPaths.siblingBackendRepo(repoName)
-            .appendingPathComponent(buildArtifactRelative)
-        if FileManager.default.isExecutableFile(atPath: sibling.path) { return sibling }
-        if id == "swift" {
-            let alts = [
-                DemoPaths.siblingBackendRepo("swift-prism")
-                    .appendingPathComponent("core/.build/release/swift-prism-analyzer"),
-                DemoPaths.siblingBackendRepo("swift-prism")
-                    .appendingPathComponent("bin/swift-prism-analyzer"),
-            ]
-            return alts.first { FileManager.default.isExecutableFile(atPath: $0.path) }
-        }
-        return nil
-    }
-}
+/// Thin wrapper over a discovered plugin (catalog is never hardcoded).
+typealias BackendPlugin = DiscoveredPlugin
 
 enum BackendCatalog {
-    static let all: [BackendPlugin] = [
-        .init(id: "swift", name: "Swift", binaryName: "swift-prism-analyzer",
-              buildArtifactRelative: "core/.build/release/swift-prism-analyzer",
-              envOverrideKey: "CODE_PRISM_BACKEND_SWIFT"),
-        .init(id: "marlin", name: "Marlin", binaryName: "marlin-prism",
-              buildArtifactRelative: "bin/marlin-prism",
-              envOverrideKey: "CODE_PRISM_BACKEND_MARLIN"),
-        .init(id: "kotlin", name: "Kotlin", binaryName: "kotlin-prism",
-              buildArtifactRelative: "bin/kotlin-prism",
-              envOverrideKey: "CODE_PRISM_BACKEND_KOTLIN"),
-        .init(id: "js", name: "JS/TS", binaryName: "js-prism",
-              buildArtifactRelative: "bin/js-prism",
-              envOverrideKey: "CODE_PRISM_BACKEND_JS"),
-        .init(id: "rust", name: "Rust", binaryName: "rust-prism",
-              buildArtifactRelative: "bin/rust-prism",
-              envOverrideKey: "CODE_PRISM_BACKEND_RUST"),
-        .init(id: "go", name: "Go", binaryName: "go-prism",
-              buildArtifactRelative: "bin/go-prism",
-              envOverrideKey: "CODE_PRISM_BACKEND_GO"),
-        .init(id: "cpp", name: "C/C++", binaryName: "cpp-prism",
-              buildArtifactRelative: "bin/cpp-prism",
-              envOverrideKey: "CODE_PRISM_BACKEND_CPP"),
-        .init(id: "objc", name: "Objective-C", binaryName: "objective-c-prism",
-              buildArtifactRelative: "bin/objective-c-prism",
-              envOverrideKey: "CODE_PRISM_BACKEND_OBJC"),
-    ]
+    /// Live discovery each call — install/checkouts can appear without restart.
+    static var all: [BackendPlugin] { PluginDiscovery.discover() }
 
-    static func plugin(id: String) -> BackendPlugin? { all.first { $0.id == id } }
+    static func plugin(id: String) -> BackendPlugin? {
+        all.first { $0.id == id }
+    }
 }
 
 enum BackendError: LocalizedError {
@@ -85,17 +18,20 @@ enum BackendError: LocalizedError {
     case analyzeFailed(String)
     case noSourceFiles
     case noProject
+    case noPlugins
 
     var errorDescription: String? {
         switch self {
         case .analyzerNotFound(let id):
-            return "Backend '\(id)' not found. Build that *-prism repo under code-prism/backends/."
+            return "Backend '\(id)' binary not runnable. Build/install that plugin."
         case .analyzeFailed(let msg):
             return "Backend failed: \(msg)"
         case .noSourceFiles:
             return "No source files matched this backend."
         case .noProject:
             return "Open a project first."
+        case .noPlugins:
+            return "No Code Prism backends found on this machine."
         }
     }
 }
@@ -106,7 +42,7 @@ enum BackendRunner {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
-        panel.message = "Choose a project to open (SoT goes to system cache, not into this folder)"
+        panel.message = "Choose a project (SoT → system cache, not into this folder)"
         panel.prompt = "Open"
         if let start { panel.directoryURL = start }
         guard panel.runModal() == .OK else { return nil }
@@ -115,41 +51,53 @@ enum BackendRunner {
 
     @discardableResult
     static func install(_ plugin: BackendPlugin) throws -> URL {
-        guard let src = plugin.resolvedBinary else {
+        guard plugin.isExecutable else {
             throw BackendError.analyzerNotFound(plugin.id)
         }
         let fm = FileManager.default
-        let dest = plugin.installedURL
+        let dest = DemoPaths.backendsRoot
+            .appendingPathComponent(plugin.id, isDirectory: true)
+            .appendingPathComponent(plugin.bin)
         try fm.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
+        // Copy manifest too
+        let destDir = dest.deletingLastPathComponent()
+        let manifestSrc = plugin.rootURL.appendingPathComponent("code-prism-plugin.json")
         if fm.fileExists(atPath: dest.path) { try fm.removeItem(at: dest) }
-        try fm.copyItem(at: src, to: dest)
+        try fm.copyItem(at: plugin.binaryURL, to: dest)
         try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dest.path)
+        if fm.fileExists(atPath: manifestSrc.path) {
+            let manifestDest = destDir.appendingPathComponent("code-prism-plugin.json")
+            if fm.fileExists(atPath: manifestDest.path) { try? fm.removeItem(at: manifestDest) }
+            try? fm.copyItem(at: manifestSrc, to: manifestDest)
+        }
         return dest
     }
 
-    /// Run backend → write SoT under ~/Library/Caches/code-prism/<lang>/<key>/.
     static func analyze(projectRoot: URL, plugin: BackendPlugin) throws -> URL {
-        var bin = plugin.resolvedBinary
-        if bin == nil { bin = try install(plugin) }
-        guard let bin, FileManager.default.isExecutableFile(atPath: bin.path) else {
+        let bin = plugin.isExecutable ? plugin.binaryURL : {
+            try? install(plugin)
+            return DemoPaths.backendsRoot
+                .appendingPathComponent(plugin.id, isDirectory: true)
+                .appendingPathComponent(plugin.bin)
+        }()
+        guard FileManager.default.isExecutableFile(atPath: bin.path) else {
             throw BackendError.analyzerNotFound(plugin.id)
         }
 
-        let cacheDir = SoTCache.directory(language: plugin.id, projectRoot: projectRoot)
+        let cacheDir = SoTCache.directory(language: plugin.id, projectRoot: projectRoot, cacheFolder: plugin.cacheFolder)
         try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
         let jsonOut = cacheDir.appendingPathComponent("prism-context.json")
 
-        switch plugin.id {
-        case "swift":
+        if plugin.id == "swift" || plugin.extensions == ["swift"] {
             try runSwiftAnalyzer(bin: bin, projectRoot: projectRoot, jsonOut: jsonOut)
-        default:
+        } else {
             try runGenericBackend(bin: bin, projectRoot: projectRoot, jsonOut: jsonOut, lang: plugin.id)
         }
 
-        // meta.json for MCP resolution
         let meta: [String: Any] = [
             "projectRoot": projectRoot.standardizedFileURL.path,
             "language": plugin.id,
+            "cacheFolder": plugin.cacheFolder,
             "projectSlug": SoTCache.projectSlug(for: projectRoot),
             "projectKey": SoTCache.projectHash(for: projectRoot),
             "generatedAt": ISO8601DateFormatter().string(from: Date()),
@@ -160,7 +108,6 @@ enum BackendRunner {
         ]
         let metaData = try JSONSerialization.data(withJSONObject: meta, options: [.prettyPrinted, .sortedKeys])
         try metaData.write(to: cacheDir.appendingPathComponent("meta.json"), options: .atomic)
-
         _ = try? importSQLite(from: jsonOut, cacheDir: cacheDir)
         return jsonOut
     }

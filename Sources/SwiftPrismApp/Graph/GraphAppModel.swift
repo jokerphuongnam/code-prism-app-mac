@@ -15,7 +15,16 @@ final class GraphAppModel: ObservableObject {
     var detectedLanguageIds: [String] { detectedLanguages.map(\.languageId) }
 
     var selectedBackends: [BackendPlugin] {
-        detectedLanguageIds.compactMap { BackendCatalog.plugin(id: $0) }
+        let plugins = PluginDiscovery.discover()
+        return detectedLanguageIds.compactMap { id in plugins.first { $0.id == id } }
+    }
+
+    var languagesLabel: String {
+        guard !detectedLanguages.isEmpty else { return "Unknown language" }
+        let plugins = PluginDiscovery.discover()
+        return detectedLanguages.map { det in
+            plugins.first { $0.id == det.languageId }?.name ?? det.languageId
+        }.joined(separator: " + ")
     }
 
     var selectedNode: GraphNode? {
@@ -33,11 +42,6 @@ final class GraphAppModel: ObservableObject {
 
     var canAnalyze: Bool {
         projectRoot != nil && !selectedBackends.isEmpty && !isBusy
-    }
-
-    var languagesLabel: String {
-        guard !detectedLanguages.isEmpty else { return "Unknown language" }
-        return detectedLanguages.map { BackendCatalog.plugin(id: $0.languageId)?.name ?? $0.languageId }.joined(separator: " + ")
     }
 
     func openProject() {
