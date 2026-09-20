@@ -88,7 +88,7 @@ struct ContentView: View {
                 ContentUnavailableView(
                     "No graph loaded",
                     systemImage: "point.3.connected.trianglepath.dotted",
-                    description: Text("Open a project, pick a language backend, Analyze to write SoT under .codeprism/.")
+                    description: Text("Open a project, pick a backend, Analyze. SoT is stored in ~/Library/Caches/code-prism/ (not inside the project).")
                 )
             } else {
                 GraphSceneView(

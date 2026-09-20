@@ -1,12 +1,11 @@
 import AppKit
 import Foundation
 
-/// Language backend plugin = CLI whose `main` writes SoT under `.codeprism/`.
+/// Language backend plugin = CLI whose `main` writes SoT into the system cache.
 struct BackendPlugin: Identifiable, Equatable {
     var id: String
     var name: String
     var binaryName: String
-    /// Relative path inside a sibling `*-prism` repo after build.
     var buildArtifactRelative: String
     var envOverrideKey: String
 
@@ -31,11 +30,12 @@ struct BackendPlugin: Identifiable, Equatable {
         let sibling = DemoPaths.siblingBackendRepo(repoName)
             .appendingPathComponent(buildArtifactRelative)
         if FileManager.default.isExecutableFile(atPath: sibling.path) { return sibling }
-        // swift special-case paths after repo split
         if id == "swift" {
             let alts = [
-                DemoPaths.siblingBackendRepo("swift-prism").appendingPathComponent("core/.build/release/swift-prism-analyzer"),
-                DemoPaths.siblingBackendRepo("swift-prism").appendingPathComponent("bin/swift-prism-analyzer"),
+                DemoPaths.siblingBackendRepo("swift-prism")
+                    .appendingPathComponent("core/.build/release/swift-prism-analyzer"),
+                DemoPaths.siblingBackendRepo("swift-prism")
+                    .appendingPathComponent("bin/swift-prism-analyzer"),
             ]
             return alts.first { FileManager.default.isExecutableFile(atPath: $0.path) }
         }
@@ -45,53 +45,27 @@ struct BackendPlugin: Identifiable, Equatable {
 
 enum BackendCatalog {
     static let all: [BackendPlugin] = [
-        BackendPlugin(
-            id: "swift",
-            name: "Swift",
-            binaryName: "swift-prism-analyzer",
-            buildArtifactRelative: "core/.build/release/swift-prism-analyzer",
-            envOverrideKey: "CODE_PRISM_BACKEND_SWIFT"
-        ),
-        BackendPlugin(
-            id: "marlin",
-            name: "Marlin",
-            binaryName: "marlin-prism",
-            buildArtifactRelative: "bin/marlin-prism",
-            envOverrideKey: "CODE_PRISM_BACKEND_MARLIN"
-        ),
-        BackendPlugin(
-            id: "kotlin",
-            name: "Kotlin",
-            binaryName: "kotlin-prism",
-            buildArtifactRelative: "bin/kotlin-prism",
-            envOverrideKey: "CODE_PRISM_BACKEND_KOTLIN"
-        ),
-        BackendPlugin(
-            id: "js",
-            name: "JS/TS",
-            binaryName: "js-prism",
-            buildArtifactRelative: "bin/js-prism",
-            envOverrideKey: "CODE_PRISM_BACKEND_JS"
-        ),
-        BackendPlugin(
-            id: "rust",
-            name: "Rust",
-            binaryName: "rust-prism",
-            buildArtifactRelative: "bin/rust-prism",
-            envOverrideKey: "CODE_PRISM_BACKEND_RUST"
-        ),
-        BackendPlugin(
-            id: "go",
-            name: "Go",
-            binaryName: "go-prism",
-            buildArtifactRelative: "bin/go-prism",
-            envOverrideKey: "CODE_PRISM_BACKEND_GO"
-        ),
+        .init(id: "swift", name: "Swift", binaryName: "swift-prism-analyzer",
+              buildArtifactRelative: "core/.build/release/swift-prism-analyzer",
+              envOverrideKey: "CODE_PRISM_BACKEND_SWIFT"),
+        .init(id: "marlin", name: "Marlin", binaryName: "marlin-prism",
+              buildArtifactRelative: "bin/marlin-prism",
+              envOverrideKey: "CODE_PRISM_BACKEND_MARLIN"),
+        .init(id: "kotlin", name: "Kotlin", binaryName: "kotlin-prism",
+              buildArtifactRelative: "bin/kotlin-prism",
+              envOverrideKey: "CODE_PRISM_BACKEND_KOTLIN"),
+        .init(id: "js", name: "JS/TS", binaryName: "js-prism",
+              buildArtifactRelative: "bin/js-prism",
+              envOverrideKey: "CODE_PRISM_BACKEND_JS"),
+        .init(id: "rust", name: "Rust", binaryName: "rust-prism",
+              buildArtifactRelative: "bin/rust-prism",
+              envOverrideKey: "CODE_PRISM_BACKEND_RUST"),
+        .init(id: "go", name: "Go", binaryName: "go-prism",
+              buildArtifactRelative: "bin/go-prism",
+              envOverrideKey: "CODE_PRISM_BACKEND_GO"),
     ]
 
-    static func plugin(id: String) -> BackendPlugin? {
-        all.first { $0.id == id }
-    }
+    static func plugin(id: String) -> BackendPlugin? { all.first { $0.id == id } }
 }
 
 enum BackendError: LocalizedError {
@@ -103,7 +77,7 @@ enum BackendError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .analyzerNotFound(let id):
-            return "Backend '\(id)' not found. Build/install that *-prism repo first."
+            return "Backend '\(id)' not found. Build that *-prism repo under code-prism/backends/."
         case .analyzeFailed(let msg):
             return "Backend failed: \(msg)"
         case .noSourceFiles:
@@ -114,35 +88,13 @@ enum BackendError: LocalizedError {
     }
 }
 
-enum SoTPaths {
-    static let dirNamePreferred = ".codeprism"
-    static let dirNameLegacy = ".swiftprism"
-    static let jsonName = "prism-context.json"
-    static let sqliteName = "graph.sqlite"
-    static let configName = "codeprism-config.json"
-
-    static func sotDir(for project: URL) -> URL {
-        let preferred = project.appendingPathComponent(dirNamePreferred, isDirectory: true)
-        let legacy = project.appendingPathComponent(dirNameLegacy, isDirectory: true)
-        if FileManager.default.fileExists(atPath: preferred.path) { return preferred }
-        if FileManager.default.fileExists(atPath: legacy.appendingPathComponent(jsonName).path) {
-            return legacy
-        }
-        return preferred
-    }
-
-    static func jsonURL(for project: URL) -> URL {
-        sotDir(for: project).appendingPathComponent(jsonName)
-    }
-}
-
 enum BackendRunner {
     static func pickProjectFolder(start: URL? = nil) -> URL? {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
-        panel.message = "Choose a project to open"
+        panel.message = "Choose a project to open (SoT goes to system cache, not into this folder)"
         panel.prompt = "Open"
         if let start { panel.directoryURL = start }
         guard panel.runModal() == .OK else { return nil }
@@ -163,42 +115,40 @@ enum BackendRunner {
         return dest
     }
 
-    /// Run backend main → write SoT under `.codeprism/`.
+    /// Run backend → write SoT under ~/Library/Caches/code-prism/<lang>/<key>/.
     static func analyze(projectRoot: URL, plugin: BackendPlugin) throws -> URL {
         var bin = plugin.resolvedBinary
-        if bin == nil {
-            bin = try install(plugin)
-        }
+        if bin == nil { bin = try install(plugin) }
         guard let bin, FileManager.default.isExecutableFile(atPath: bin.path) else {
             throw BackendError.analyzerNotFound(plugin.id)
         }
 
-        let sotDir = projectRoot.appendingPathComponent(SoTPaths.dirNamePreferred, isDirectory: true)
-        try FileManager.default.createDirectory(at: sotDir, withIntermediateDirectories: true)
-        let gitignore = sotDir.appendingPathComponent(".gitignore")
-        if !FileManager.default.fileExists(atPath: gitignore.path) {
-            try "*\n".write(to: gitignore, atomically: true, encoding: .utf8)
-        }
-        let jsonOut = sotDir.appendingPathComponent(SoTPaths.jsonName)
+        let cacheDir = SoTCache.directory(language: plugin.id, projectRoot: projectRoot)
+        try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+        let jsonOut = cacheDir.appendingPathComponent("prism-context.json")
 
         switch plugin.id {
         case "swift":
             try runSwiftAnalyzer(bin: bin, projectRoot: projectRoot, jsonOut: jsonOut)
         default:
-            // Generic CLI: <bin> --root <project> --out <json>
-            try runGenericBackend(bin: bin, projectRoot: projectRoot, jsonOut: jsonOut)
+            try runGenericBackend(bin: bin, projectRoot: projectRoot, jsonOut: jsonOut, lang: plugin.id)
         }
 
-        _ = try? importSQLite(from: jsonOut, sotDir: sotDir)
-
-        let cfg: [String: String] = [
-            "graphPath": jsonOut.path,
-            "sqlitePath": sotDir.appendingPathComponent(SoTPaths.sqliteName).path,
-            "projectRoot": projectRoot.path,
-            "backend": plugin.id,
+        // meta.json for MCP resolution
+        let meta: [String: Any] = [
+            "projectRoot": projectRoot.standardizedFileURL.path,
+            "language": plugin.id,
+            "projectKey": SoTCache.projectKey(for: projectRoot),
+            "generatedAt": ISO8601DateFormatter().string(from: Date()),
+            "sot": [
+                "json": jsonOut.path,
+                "sqlite": cacheDir.appendingPathComponent("graph.sqlite").path,
+            ],
         ]
-        let data = try JSONSerialization.data(withJSONObject: cfg, options: [.prettyPrinted, .sortedKeys])
-        try data.write(to: sotDir.appendingPathComponent(SoTPaths.configName), options: .atomic)
+        let metaData = try JSONSerialization.data(withJSONObject: meta, options: [.prettyPrinted, .sortedKeys])
+        try metaData.write(to: cacheDir.appendingPathComponent("meta.json"), options: .atomic)
+
+        _ = try? importSQLite(from: jsonOut, cacheDir: cacheDir)
         return jsonOut
     }
 
@@ -217,10 +167,10 @@ enum BackendRunner {
         try run(proc)
     }
 
-    private static func runGenericBackend(bin: URL, projectRoot: URL, jsonOut: URL) throws {
+    private static func runGenericBackend(bin: URL, projectRoot: URL, jsonOut: URL, lang: String) throws {
         let proc = Process()
         proc.executableURL = bin
-        proc.arguments = ["--root", projectRoot.path, "--out", jsonOut.path]
+        proc.arguments = ["--root", projectRoot.path, "--out", jsonOut.path, "--lang", lang]
         try run(proc)
     }
 
@@ -237,7 +187,7 @@ enum BackendRunner {
     }
 
     private static func sourceFiles(in root: URL, extensions: [String]) -> [URL] {
-        let skip = [".build", "DerivedData", "Pods", "node_modules", ".git", ".codeprism", ".swiftprism", "Carthage", "dist"]
+        let skip = [".build", "DerivedData", "Pods", "node_modules", ".git", "Carthage", "dist", "target"]
         guard let enumerator = FileManager.default.enumerator(
             at: root,
             includingPropertiesForKeys: [.isRegularFileKey],
@@ -250,22 +200,15 @@ enum BackendRunner {
                 enumerator.skipDescendants()
                 continue
             }
-            if extSet.contains(url.pathExtension.lowercased()) {
-                out.append(url)
-            }
+            if extSet.contains(url.pathExtension.lowercased()) { out.append(url) }
         }
         return out.sorted { $0.path < $1.path }
     }
 
-    private static func importSQLite(from json: URL, sotDir: URL) throws -> URL {
-        let db = sotDir.appendingPathComponent(SoTPaths.sqliteName)
-        let helpers = [
-            URL(fileURLWithPath: ("~/Documents/Code/mcp-prism/dist/graph-db.js" as NSString).expandingTildeInPath),
-            DemoPaths.siblingBackendRepo("swift-prism").appendingPathComponent("mcp-server/dist/graph-db.js"),
-        ]
-        guard let helper = helpers.first(where: { FileManager.default.fileExists(atPath: $0.path) }) else {
-            return db
-        }
+    private static func importSQLite(from json: URL, cacheDir: URL) throws -> URL {
+        let db = cacheDir.appendingPathComponent("graph.sqlite")
+        let helper = URL(fileURLWithPath: ("~/Documents/Code/mcp-prism/dist/graph-db.js" as NSString).expandingTildeInPath)
+        guard FileManager.default.fileExists(atPath: helper.path) else { return db }
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         proc.arguments = ["node", helper.path, "import", json.path, db.path]

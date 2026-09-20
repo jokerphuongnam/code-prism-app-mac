@@ -76,16 +76,16 @@ final class GraphAppModel: ObservableObject {
         }
         let plugin = selectedBackend
         isBusy = true
-        status = "Running \(plugin.name) backend → .codeprism SoT…"
+        status = "Running \(plugin.name) backend → ~/Library/Caches/code-prism/…"
         DispatchQueue.global(qos: .userInitiated).async {
             do {
                 let json = try BackendRunner.analyze(projectRoot: root, plugin: plugin)
-                let doc = try GraphLoader.load(projectRoot: root)
+                let doc = try GraphLoader.load(projectRoot: root, language: plugin.id)
                 DispatchQueue.main.async {
                     self.document = doc
                     self.selectedId = doc.nodes.first?.id
                     self.isBusy = false
-                    self.status = "SoT ready (\(plugin.name)): \(doc.nodes.count) nodes, \(doc.links.count) links · \(json.lastPathComponent)"
+                    self.status = "SoT cached (\(plugin.name)): \(doc.nodes.count) nodes, \(doc.links.count) links · \(json.deletingLastPathComponent().path)"
                 }
             } catch {
                 DispatchQueue.main.async {
@@ -99,10 +99,10 @@ final class GraphAppModel: ObservableObject {
     func tryLoadSoT() {
         guard let root = projectRoot else { return }
         do {
-            let doc = try GraphLoader.load(projectRoot: root)
+            let doc = try GraphLoader.load(projectRoot: root, language: selectedBackendId)
             document = doc
             if selectedId == nil { selectedId = doc.nodes.first?.id }
-            status = "Loaded SoT: \(doc.nodes.count) nodes, \(doc.links.count) links"
+            status = "Loaded SoT from cache: \(doc.nodes.count) nodes, \(doc.links.count) links"
         } catch {
             document = .empty
             status = error.localizedDescription

@@ -1,11 +1,12 @@
 import Foundation
 
 enum GraphLoader {
-    /// Load SoT for a project: `.codeprism/` preferred, `.swiftprism/` legacy.
-    static func load(projectRoot: URL) throws -> GraphDocument {
-        let sot = SoTPaths.jsonURL(for: projectRoot)
-        guard FileManager.default.fileExists(atPath: sot.path) else {
-            throw LoadError.missingSoT(sot)
+    /// Load SoT from system cache for this project (never requires in-tree .codeprism).
+    static func load(projectRoot: URL, language: String? = nil) throws -> GraphDocument {
+        guard let sot = SoTCache.resolveJSON(projectRoot: projectRoot, preferred: language) else {
+            throw LoadError.missingSoT(
+                SoTCache.directory(language: language ?? "swift", projectRoot: projectRoot)
+            )
         }
         let data = try Data(contentsOf: sot)
         return try decode(data: data, projectRoot: projectRoot.path)
@@ -157,7 +158,7 @@ enum GraphLoader {
         var errorDescription: String? {
             switch self {
             case .missingSoT(let url):
-                return "No SoT at \(url.path). Install/run the Swift backend (Analyze) first."
+                return "No SoT in cache (\(url.path)). Install/run a backend (Analyze) first — data goes to ~/Library/Caches/code-prism/, not into your project."
             case .unsupportedSchema:
                 return "Unrecognized prism-context.json schema."
             }

@@ -10,6 +10,7 @@
 		07204598D773BB5088272B3B /* ForceLayout3D.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3407AE6380211C9A6593429 /* ForceLayout3D.swift */; };
 		18DA3EEAEAF06EC39084A45B /* GraphLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53173912AFA322EA7E7E8ED /* GraphLoader.swift */; };
 		1FE4E68B2CA82C367960D88A /* DemoPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98ACBFF84C553A88F52549DD /* DemoPaths.swift */; };
+		21EF0993105B6146F589FCCF /* SoTCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13BAE55D6FE59DF0B3E676EB /* SoTCache.swift */; };
 		3E79D3DD3F0B062B8F96C690 /* InspectorPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AB1E4B73BB403BD5057C1B6 /* InspectorPanel.swift */; };
 		3EA750FE5D7F5A7F6969DBAD /* GraphAppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB82A81CF358FACC428C6B98 /* GraphAppModel.swift */; };
 		3F7B1F96D0A9C2D4DC2E8C81 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 586DED365D5B90A6FC7C5E12 /* ContentView.swift */; };
@@ -21,6 +22,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		13BAE55D6FE59DF0B3E676EB /* SoTCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoTCache.swift; sourceTree = "<group>"; };
 		3A25EA757E5BC1D7F8254277 /* BackendPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendPlugin.swift; sourceTree = "<group>"; };
 		3AB1E4B73BB403BD5057C1B6 /* InspectorPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorPanel.swift; sourceTree = "<group>"; };
 		5300AFAD18F35ADFA6354A2C /* SwiftPrismApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SwiftPrismApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -72,6 +74,7 @@
 			children = (
 				3A25EA757E5BC1D7F8254277 /* BackendPlugin.swift */,
 				98ACBFF84C553A88F52549DD /* DemoPaths.swift */,
+				13BAE55D6FE59DF0B3E676EB /* SoTCache.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -178,6 +181,7 @@
 				A25E74E98239985B771FB89F /* GraphSceneView.swift in Sources */,
 				3E79D3DD3F0B062B8F96C690 /* InspectorPanel.swift in Sources */,
 				5172F38EBAE250A6DF331BB6 /* NodeGeometry.swift in Sources */,
+				21EF0993105B6146F589FCCF /* SoTCache.swift in Sources */,
 				BB6DB7E814D7E8F5EC1AD8DD /* SwiftPrismApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
