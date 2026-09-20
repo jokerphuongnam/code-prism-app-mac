@@ -8,14 +8,14 @@ final class GraphAppModel: ObservableObject {
     @Published var selectedId: String?
     @Published var status: String = "Open a project (or LiteTrace demo)."
     @Published var isBusy = false
-    /// Auto-detected language id (`swift`, `js`, …). `nil` if unknown / error.
-    @Published var detectedLanguageId: String?
-    @Published var detectEvidence: String = ""
+    /// All detected languages (may be multiple).
+    @Published var detectedLanguages: [LanguageDetect.Result] = []
     @Published var searchQuery: String = ""
 
-    var selectedBackend: BackendPlugin? {
-        guard let detectedLanguageId else { return nil }
-        return BackendCatalog.plugin(id: detectedLanguageId)
+    var detectedLanguageIds: [String] { detectedLanguages.map(\.languageId) }
+
+    var selectedBackends: [BackendPlugin] {
+        detectedLanguageIds.compactMap { BackendCatalog.plugin(id: $0) }
     }
 
     var selectedNode: GraphNode? {
@@ -32,7 +32,12 @@ final class GraphAppModel: ObservableObject {
     }
 
     var canAnalyze: Bool {
-        projectRoot != nil && selectedBackend != nil && !isBusy
+        projectRoot != nil && !selectedBackends.isEmpty && !isBusy
+    }
+
+    var languagesLabel: String {
+        guard !detectedLanguages.isEmpty else { return "Unknown language" }
+        return detectedLanguages.map { BackendCatalog.plugin(id: $0.languageId)?.name ?? $0.languageId }.joined(separator: " + ")
     }
 
     func openProject() {
@@ -50,46 +55,45 @@ final class GraphAppModel: ObservableObject {
         adoptProject(url)
     }
 
-    /// Set project root, auto-detect language, load cache if any.
     private func adoptProject(_ url: URL) {
         projectRoot = url
         document = .empty
         selectedId = nil
         do {
-            let detected = try LanguageDetect.detect(projectRoot: url)
-            detectedLanguageId = detected.languageId
-            detectEvidence = detected.evidence
-            let langName = selectedBackend?.name ?? detected.languageId
-            status = "\(url.lastPathComponent) → \(langName) (\(detected.evidence))"
+            let detected = try LanguageDetect.detectAll(projectRoot: url)
+            detectedLanguages = detected
+            let detail = detected.map { "\($0.languageId)(\($0.evidence))" }.joined(separator: "; ")
+            status = "\(url.lastPathComponent) → \(languagesLabel) · \(detail)"
             tryLoadSoT()
         } catch {
-            detectedLanguageId = nil
-            detectEvidence = ""
+            detectedLanguages = []
             document = .empty
             status = error.localizedDescription
         }
     }
 
     func installSelectedBackend() {
-        guard let plugin = selectedBackend else {
+        let plugins = selectedBackends
+        guard !plugins.isEmpty else {
             status = "Chưa nhận diện được ngôn ngữ — không cài được backend."
             return
         }
         isBusy = true
-        status = "Installing \(plugin.name) backend…"
+        status = "Installing \(plugins.map(\.name).joined(separator: ", "))…"
         DispatchQueue.global(qos: .userInitiated).async {
-            do {
-                let dest = try BackendRunner.install(plugin)
-                DispatchQueue.main.async {
-                    self.isBusy = false
-                    self.status = "Installed \(plugin.name) → \(dest.path)"
-                    self.objectWillChange.send()
+            var messages: [String] = []
+            for plugin in plugins {
+                do {
+                    let dest = try BackendRunner.install(plugin)
+                    messages.append("\(plugin.name)→\(dest.lastPathComponent)")
+                } catch {
+                    messages.append("\(plugin.name): \(error.localizedDescription)")
                 }
-            } catch {
-                DispatchQueue.main.async {
-                    self.isBusy = false
-                    self.status = error.localizedDescription
-                }
+            }
+            DispatchQueue.main.async {
+                self.isBusy = false
+                self.status = messages.joined(separator: " · ")
+                self.objectWillChange.send()
             }
         }
     }
@@ -99,26 +103,39 @@ final class GraphAppModel: ObservableObject {
             status = BackendError.noProject.localizedDescription
             return
         }
-        guard let plugin = selectedBackend else {
+        let plugins = selectedBackends
+        guard !plugins.isEmpty else {
             status = "Không nhận diện được ngôn ngữ cho project này — Analyze bị hủy."
             return
         }
         isBusy = true
-        status = "Running \(plugin.name) backend → ~/Library/Caches/code-prism/…"
+        status = "Running \(plugins.map(\.name).joined(separator: "+")) → ~/Library/Caches/code-prism/…"
+        let langs = plugins.map(\.id)
         DispatchQueue.global(qos: .userInitiated).async {
+            var errors: [String] = []
+            for plugin in plugins {
+                do {
+                    _ = try BackendRunner.analyze(projectRoot: root, plugin: plugin)
+                } catch {
+                    errors.append("\(plugin.name): \(error.localizedDescription)")
+                }
+            }
             do {
-                let json = try BackendRunner.analyze(projectRoot: root, plugin: plugin)
-                let doc = try GraphLoader.load(projectRoot: root, language: plugin.id)
+                let doc = try GraphLoader.loadMerged(projectRoot: root, languages: langs)
                 DispatchQueue.main.async {
                     self.document = doc
                     self.selectedId = doc.nodes.first?.id
                     self.isBusy = false
-                    self.status = "SoT cached (\(plugin.name)): \(doc.nodes.count) nodes, \(doc.links.count) links · \(json.deletingLastPathComponent().path)"
+                    var msg = "SoT multi-lang: \(doc.nodes.count) nodes, \(doc.links.count) links (\(langs.joined(separator: "+")))"
+                    if !errors.isEmpty {
+                        msg += " · partial errors: " + errors.joined(separator: "; ")
+                    }
+                    self.status = msg
                 }
             } catch {
                 DispatchQueue.main.async {
                     self.isBusy = false
-                    self.status = error.localizedDescription
+                    self.status = errors.isEmpty ? error.localizedDescription : errors.joined(separator: "; ")
                 }
             }
         }
@@ -126,23 +143,19 @@ final class GraphAppModel: ObservableObject {
 
     func tryLoadSoT() {
         guard let root = projectRoot else { return }
-        guard let lang = detectedLanguageId else {
+        let langs = detectedLanguageIds
+        guard !langs.isEmpty else {
             document = .empty
             return
         }
         do {
-            let doc = try GraphLoader.load(projectRoot: root, language: lang)
+            let doc = try GraphLoader.loadMerged(projectRoot: root, languages: langs)
             document = doc
             if selectedId == nil { selectedId = doc.nodes.first?.id }
-            status = "Loaded SoT (\(lang)): \(doc.nodes.count) nodes, \(doc.links.count) links"
+            status = "Loaded SoT (\(langs.joined(separator: "+"))): \(doc.nodes.count) nodes, \(doc.links.count) links"
         } catch {
             document = .empty
-            // Keep detect status; append load hint
-            if let backend = selectedBackend {
-                status = "\(root.lastPathComponent) → \(backend.name) (\(detectEvidence)). Chưa có cache — bấm Analyze."
-            } else {
-                status = error.localizedDescription
-            }
+            status = "\(root.lastPathComponent) → \(languagesLabel). Chưa có cache — bấm Analyze."
         }
     }
 }

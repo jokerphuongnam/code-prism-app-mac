@@ -150,7 +150,8 @@ enum BackendRunner {
         let meta: [String: Any] = [
             "projectRoot": projectRoot.standardizedFileURL.path,
             "language": plugin.id,
-            "projectKey": SoTCache.projectKey(for: projectRoot),
+            "projectSlug": SoTCache.projectSlug(for: projectRoot),
+            "projectKey": SoTCache.projectHash(for: projectRoot),
             "generatedAt": ISO8601DateFormatter().string(from: Date()),
             "sot": [
                 "json": jsonOut.path,

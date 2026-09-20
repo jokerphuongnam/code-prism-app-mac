@@ -20,13 +20,11 @@ struct ContentView: View {
                 Button("Open…") { model.openProject() }
                 Button("LiteTrace demo") { model.openLiteTraceDemo() }
                 Divider()
-                if let backend = model.selectedBackend {
-                    Text(backend.name)
+                if !model.detectedLanguages.isEmpty {
+                    Text(model.languagesLabel)
                         .foregroundStyle(.secondary)
-                        .help(model.detectEvidence)
-                    Button(backend.isInstalled ? "Reinstall backend" : "Install backend") {
-                        model.installSelectedBackend()
-                    }
+                        .help(model.detectedLanguages.map { "\($0.languageId): \($0.evidence)" }.joined(separator: "\n"))
+                    Button("Install backend(s)") { model.installSelectedBackend() }
                 } else if model.projectRoot != nil {
                     Text("Unknown language")
                         .foregroundStyle(.red)
@@ -34,7 +32,7 @@ struct ContentView: View {
                 Button("Analyze → SoT") { model.analyze() }
                     .disabled(!model.canAnalyze)
                 Button("Reload SoT") { model.tryLoadSoT() }
-                    .disabled(model.projectRoot == nil || model.selectedBackend == nil || model.isBusy)
+                    .disabled(model.projectRoot == nil || model.detectedLanguages.isEmpty || model.isBusy)
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -42,7 +40,7 @@ struct ContentView: View {
                 if model.isBusy { ProgressView().controlSize(.small) }
                 Text(model.status)
                     .font(.caption)
-                    .foregroundStyle(model.selectedBackend == nil && model.projectRoot != nil ? .red : .secondary)
+                    .foregroundStyle(model.detectedLanguages.isEmpty && model.projectRoot != nil ? .red : .secondary)
                     .lineLimit(2)
                 Spacer()
                 if let root = model.projectRoot {
@@ -65,6 +63,13 @@ struct ContentView: View {
                 .padding(.horizontal, 8)
                 .padding(.top, 8)
 
+            if model.detectedLanguages.count > 1 {
+                Text("Languages: \(model.languagesLabel)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+            }
+
             List(selection: $model.selectedId) {
                 Section("Nodes (\(model.filteredNodes.count))") {
                     ForEach(model.filteredNodes) { node in
@@ -86,7 +91,7 @@ struct ContentView: View {
 
     private var graphPane: some View {
         ZStack {
-            if model.projectRoot != nil, model.selectedBackend == nil {
+            if model.projectRoot != nil, model.detectedLanguages.isEmpty {
                 ContentUnavailableView(
                     "Không nhận diện ngôn ngữ",
                     systemImage: "exclamationmark.triangle",
@@ -96,7 +101,7 @@ struct ContentView: View {
                 ContentUnavailableView(
                     "No graph loaded",
                     systemImage: "point.3.connected.trianglepath.dotted",
-                    description: Text("Open a project (language is detected automatically), then Analyze. SoT → ~/Library/Caches/code-prism/.")
+                    description: Text("Open a project (all languages are detected), then Analyze. SoT → ~/Library/Caches/code-prism/<lang>/…")
                 )
             } else {
                 GraphSceneView(

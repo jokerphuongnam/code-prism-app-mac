@@ -12,6 +12,51 @@ enum GraphLoader {
         return try decode(data: data, projectRoot: projectRoot.path)
     }
 
+    /// Merge SoT for multiple languages of the same project (prefix node ids with `lang:` to avoid clashes).
+    static func loadMerged(projectRoot: URL, languages: [String]) throws -> GraphDocument {
+        var merged = GraphDocument(
+            projectRoot: projectRoot.path,
+            generatedAt: ISO8601DateFormatter().string(from: Date()),
+            nodes: [],
+            links: []
+        )
+        var loadedAny = false
+        var lastError: Error?
+        for lang in languages {
+            do {
+                let doc = try load(projectRoot: projectRoot, language: lang)
+                loadedAny = true
+                let prefix = languages.count > 1 ? "\(lang)::" : ""
+                for n in doc.nodes {
+                    var nn = n
+                    nn.id = prefix + n.id
+                    nn.dependencies = n.dependencies.map { prefix + $0 }
+                    if languages.count > 1 {
+                        nn.name = "[\(lang)] \(n.name)"
+                    }
+                    merged.nodes.append(nn)
+                }
+                for l in doc.links {
+                    merged.links.append(
+                        GraphLink(
+                            source: prefix + l.source,
+                            target: prefix + l.target,
+                            kind: l.kind
+                        )
+                    )
+                }
+            } catch {
+                lastError = error
+            }
+        }
+        if !loadedAny {
+            throw lastError ?? LoadError.missingSoT(
+                SoTCache.directory(language: languages.first ?? "swift", projectRoot: projectRoot)
+            )
+        }
+        return merged
+    }
+
     static func decode(data: Data, projectRoot: String) throws -> GraphDocument {
         // Try flat nodes schema first (MCP / schema 4).
         if let flat = try? JSONDecoder().decode(FlatGraphDocument.self, from: data),
