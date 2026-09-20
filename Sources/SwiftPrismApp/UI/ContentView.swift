@@ -4,6 +4,32 @@ struct ContentView: View {
     @EnvironmentObject private var model: GraphAppModel
 
     var body: some View {
+        Group {
+            switch model.screen {
+            case .welcome:
+                WelcomeScreen()
+            case .build:
+                BuildScreen()
+            case .graph:
+                graphWorkspace
+            }
+        }
+        .toolbar {
+            ToolbarItemGroup {
+                if model.screen != .welcome {
+                    Button("Open…") { model.openProject() }
+                        .keyboardShortcut("o", modifiers: [.command])
+                }
+                if model.screen == .graph {
+                    Button("Build…") { model.backToBuild() }
+                    Button("Rebuild") { model.analyze(fullBuild: true) }
+                        .disabled(!model.canAnalyze)
+                }
+            }
+        }
+    }
+
+    private var graphWorkspace: some View {
         NavigationSplitView {
             sidebar
                 .frame(minWidth: 220, idealWidth: 260, maxWidth: 320)
@@ -15,34 +41,19 @@ struct ContentView: View {
                     .frame(minWidth: 240, idealWidth: 280, maxWidth: 360)
             }
         }
-        .toolbar {
-            ToolbarItemGroup {
-                Button("Open…") { model.openProject() }
-                Button("LiteTrace demo") { model.openLiteTraceDemo() }
-                Divider()
-                if !model.detectedLanguages.isEmpty {
-                    Text(model.languagesLabel)
-                        .foregroundStyle(.secondary)
-                        .help(model.detectedLanguages.map { "\($0.languageId): \($0.evidence)" }.joined(separator: "\n"))
-                    Button("Install backend(s)") { model.installSelectedBackend() }
-                } else if model.projectRoot != nil {
-                    Text("Unknown language")
-                        .foregroundStyle(.red)
-                }
-                Button("Analyze → SoT") { model.analyze() }
-                    .disabled(!model.canAnalyze)
-                Button("Reload SoT") { model.tryLoadSoT() }
-                    .disabled(model.projectRoot == nil || model.detectedLanguages.isEmpty || model.isBusy)
-            }
-        }
         .safeAreaInset(edge: .bottom) {
             HStack {
                 if model.isBusy { ProgressView().controlSize(.small) }
                 Text(model.status)
                     .font(.caption)
-                    .foregroundStyle(model.detectedLanguages.isEmpty && model.projectRoot != nil ? .red : .secondary)
+                    .foregroundStyle(.secondary)
                     .lineLimit(2)
                 Spacer()
+                if !model.detectedLanguages.isEmpty {
+                    Text(model.languagesLabel)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
                 if let root = model.projectRoot {
                     Text(root.path)
                         .font(.caption2)
@@ -91,17 +102,11 @@ struct ContentView: View {
 
     private var graphPane: some View {
         ZStack {
-            if model.projectRoot != nil, model.detectedLanguages.isEmpty {
-                ContentUnavailableView(
-                    "Không nhận diện ngôn ngữ",
-                    systemImage: "exclamationmark.triangle",
-                    description: Text(model.status)
-                )
-            } else if model.document.nodes.isEmpty {
+            if model.document.nodes.isEmpty {
                 ContentUnavailableView(
                     "No graph loaded",
                     systemImage: "point.3.connected.trianglepath.dotted",
-                    description: Text("Open a project (all languages are detected), then Analyze. SoT → ~/Library/Caches/code-prism/<lang>/…")
+                    description: Text("Go back to Build and run Build into cache.")
                 )
             } else {
                 GraphSceneView(
