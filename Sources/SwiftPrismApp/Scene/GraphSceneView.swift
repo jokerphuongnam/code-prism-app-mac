@@ -29,6 +29,9 @@ struct GraphSceneView: NSViewRepresentable {
         view.onCommandScroll = { delta in
             context.coordinator.nudgeZoomFromScroll(delta)
         }
+        view.onPinchZoom = { mag in
+            context.coordinator.applyPinchZoom(mag)
+        }
         view.onOrbitDrag = { dx, dy, ended in
             context.coordinator.handleOrbitDrag(dx: dx, dy: dy, ended: ended)
         }
@@ -53,6 +56,9 @@ struct GraphSceneView: NSViewRepresentable {
         if let hover = nsView as? HoverSCNView {
             hover.onCommandScroll = { delta in
                 context.coordinator.nudgeZoomFromScroll(delta)
+            }
+            hover.onPinchZoom = { mag in
+                context.coordinator.applyPinchZoom(mag)
             }
             hover.onOrbitDrag = { dx, dy, ended in
                 context.coordinator.handleOrbitDrag(dx: dx, dy: dy, ended: ended)
@@ -125,6 +131,14 @@ struct GraphSceneView: NSViewRepresentable {
 
         func nudgeZoomFromScroll(_ deltaY: CGFloat) {
             let factor: CGFloat = deltaY > 0 ? 1.08 : 0.92
+            let next = min(max(externalZoom * factor, 0.35), 4.0)
+            onZoomChange(next)
+        }
+
+        /// Trackpad pinch: `magnification` > 0 = zoom in (spread), < 0 = zoom out.
+        func applyPinchZoom(_ magnification: CGFloat) {
+            guard abs(magnification) > 0.0005 else { return }
+            let factor = max(0.5, min(1.8, 1 + magnification * 1.45))
             let next = min(max(externalZoom * factor, 0.35), 4.0)
             onZoomChange(next)
         }
@@ -563,18 +577,57 @@ struct GraphSceneView: NSViewRepresentable {
     }
 }
 
-/// SCNView with smooth orbit drag + ⌘+scroll zoom.
+/// SCNView with smooth orbit drag + pinch / ⌘+scroll zoom.
 final class HoverSCNView: SCNView {
     var onHoverChange: ((Bool) -> Void)?
     var onCommandScroll: ((CGFloat) -> Void)?
+    /// Delta magnification from trackpad pinch (spread = positive).
+    var onPinchZoom: ((CGFloat) -> Void)?
     var onOrbitDrag: ((CGFloat, CGFloat, Bool) -> Void)?
     private var scrollMonitor: Any?
     private var lastDrag: NSPoint?
+    private var lastGestureMagnification: CGFloat = 0
     var didDrag = false
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if window != nil { installMonitor() } else { removeMonitor() }
+        if window != nil {
+            installMonitor()
+            installPinchRecognizerIfNeeded()
+            window?.makeFirstResponder(self)
+        } else {
+            removeMonitor()
+        }
+    }
+
+    private func installPinchRecognizerIfNeeded() {
+        let already = gestureRecognizers.contains { $0 is NSMagnificationGestureRecognizer }
+        guard !already else { return }
+        let pinch = NSMagnificationGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+        addGestureRecognizer(pinch)
+    }
+
+    @objc private func handlePinch(_ gesture: NSMagnificationGestureRecognizer) {
+        switch gesture.state {
+        case .began:
+            lastGestureMagnification = 0
+        case .changed:
+            let delta = gesture.magnification - lastGestureMagnification
+            lastGestureMagnification = gesture.magnification
+            if abs(delta) > 0.0005 {
+                onPinchZoom?(delta)
+            }
+        default:
+            lastGestureMagnification = 0
+        }
+    }
+
+    /// Fallback if the system delivers magnify events directly.
+    override func magnify(with event: NSEvent) {
+        let m = event.magnification
+        if abs(m) > 0.0005 {
+            onPinchZoom?(m)
+        }
     }
 
     override func mouseEntered(with event: NSEvent) {
