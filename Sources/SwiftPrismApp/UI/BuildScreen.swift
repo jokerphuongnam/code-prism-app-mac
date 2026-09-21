@@ -42,8 +42,15 @@ struct BuildScreen: View {
                     .frame(maxWidth: 480)
 
                 if model.isBusy {
-                    ProgressView(model.buildProgressLabel)
-                        .frame(maxWidth: 400)
+                    VStack(spacing: 8) {
+                        ProgressView(model.buildProgressLabel)
+                            .frame(maxWidth: 400)
+                        Text("Large monorepos (e.g. private-source) can sit on Swift for a while — prefer opening `marlin-language/` or Cancel.")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: 420)
+                    }
                 }
 
                 HStack(spacing: 12) {
@@ -57,6 +64,13 @@ struct BuildScreen: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(!model.canAnalyze)
+
+                    if model.isBusy {
+                        Button("Cancel") {
+                            model.cancelBuild()
+                        }
+                        .keyboardShortcut(.cancelAction)
+                    }
 
                     if model.hasCachedGraph {
                         Button("Skip — open graph") {

@@ -19,6 +19,8 @@ enum BackendError: LocalizedError {
     case noSourceFiles
     case noProject
     case noPlugins
+    case cancelled
+    case tooManyFiles(Int)
 
     var errorDescription: String? {
         switch self {
@@ -32,11 +34,41 @@ enum BackendError: LocalizedError {
             return "Open a project first."
         case .noPlugins:
             return "No Code Prism backends found on this machine."
+        case .cancelled:
+            return "Build cancelled."
+        case .tooManyFiles(let n):
+            return "Too many source files (\(n)). Open a smaller package root, or exclude .agents/qa/Generated."
         }
     }
 }
 
 enum BackendRunner {
+    /// Directories never walked for detect/analyze (monorepo noise).
+    static let skipDirectoryNames: Set<String> = [
+        ".build", "DerivedData", "Pods", "node_modules", ".git", "Carthage",
+        "dist", "target", ".next", ".turbo", "__pycache__", ".venv", "vendor",
+        ".agents", "Generated", "generated", ".swiftpm", "xcuserdata",
+        "build", "Checkouts",
+    ]
+
+    private static let processLock = NSLock()
+    private static var currentProcess: Process?
+    private static var cancelRequested = false
+
+    static func cancelActiveAnalyze() {
+        processLock.lock()
+        cancelRequested = true
+        currentProcess?.terminate()
+        currentProcess = nil
+        processLock.unlock()
+    }
+
+    static func resetCancelFlag() {
+        processLock.lock()
+        cancelRequested = false
+        processLock.unlock()
+    }
+
     static func pickProjectFolder(start: URL? = nil) -> URL? {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
@@ -74,6 +106,13 @@ enum BackendRunner {
     }
 
     static func analyze(projectRoot: URL, plugin: BackendPlugin) throws -> URL {
+        processLock.lock()
+        if cancelRequested {
+            processLock.unlock()
+            throw BackendError.cancelled
+        }
+        processLock.unlock()
+
         let bin = plugin.isExecutable ? plugin.binaryURL : {
             try? install(plugin)
             return DemoPaths.backendsRoot
@@ -113,33 +152,69 @@ enum BackendRunner {
     }
 
     private static func runSwiftAnalyzer(bin: URL, projectRoot: URL, jsonOut: URL) throws {
+        // Filter noise (.agents / Generated / qa fixtures under huge monorepos).
         let files = sourceFiles(in: projectRoot, extensions: ["swift"])
         guard !files.isEmpty else { throw BackendError.noSourceFiles }
+        // Passing 1000+ paths hangs / hits ARG_MAX. Prefer filtered list; if still huge, workspace-only.
         let proc = Process()
         proc.executableURL = bin
-        proc.arguments = [
+        var args = [
             "--workspace", projectRoot.path,
             "--scan-targets",
             "--public-only-external",
             "--context",
             "--output", jsonOut.path,
-        ] + files.map(\.path)
-        try run(proc)
+        ]
+        if files.count <= 250 {
+            args.append(contentsOf: files.map(\.path))
+        }
+        // else: workspace scan without argv dump (still may be slow — timeout protects UI)
+        proc.arguments = args
+        try run(proc, timeout: files.count > 250 ? 90 : 180)
     }
 
     private static func runGenericBackend(bin: URL, projectRoot: URL, jsonOut: URL, lang: String) throws {
         let proc = Process()
         proc.executableURL = bin
         proc.arguments = ["--root", projectRoot.path, "--out", jsonOut.path, "--lang", lang]
-        try run(proc)
+        try run(proc, timeout: 180)
     }
 
-    private static func run(_ proc: Process) throws {
+    private static func run(_ proc: Process, timeout: TimeInterval) throws {
+        processLock.lock()
+        if cancelRequested {
+            processLock.unlock()
+            throw BackendError.cancelled
+        }
+        currentProcess = proc
+        processLock.unlock()
+
         let errPipe = Pipe()
         proc.standardOutput = Pipe()
         proc.standardError = errPipe
         try proc.run()
-        proc.waitUntilExit()
+
+        let group = DispatchGroup()
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            proc.waitUntilExit()
+            group.leave()
+        }
+        let waitResult = group.wait(timeout: .now() + timeout)
+
+        processLock.lock()
+        currentProcess = nil
+        let cancelled = cancelRequested
+        processLock.unlock()
+
+        if waitResult == .timedOut {
+            proc.terminate()
+            throw BackendError.analyzeFailed("timeout after \(Int(timeout))s — open a smaller root or Cancel and retry")
+        }
+        // 15 = SIGTERM after Cancel
+        if cancelled || proc.terminationStatus == 15 || proc.terminationStatus == 9 {
+            throw BackendError.cancelled
+        }
         let err = String(data: errPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
         if proc.terminationStatus != 0 {
             throw BackendError.analyzeFailed(err.isEmpty ? "exit \(proc.terminationStatus)" : err)
@@ -147,7 +222,6 @@ enum BackendRunner {
     }
 
     private static func sourceFiles(in root: URL, extensions: [String]) -> [URL] {
-        let skip = [".build", "DerivedData", "Pods", "node_modules", ".git", "Carthage", "dist", "target"]
         guard let enumerator = FileManager.default.enumerator(
             at: root,
             includingPropertiesForKeys: [.isRegularFileKey],
@@ -156,7 +230,7 @@ enum BackendRunner {
         var out: [URL] = []
         let extSet = Set(extensions.map { $0.lowercased() })
         for case let url as URL in enumerator {
-            if skip.contains(where: { url.pathComponents.contains($0) }) {
+            if skipDirectoryNames.contains(where: { url.pathComponents.contains($0) }) {
                 enumerator.skipDescendants()
                 continue
             }

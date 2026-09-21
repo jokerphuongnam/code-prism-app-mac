@@ -30,10 +30,7 @@ enum LanguageDetect {
         guard !plugins.isEmpty else { throw DetectError.noPlugins }
 
         let fm = FileManager.default
-        let skip = Set([
-            ".build", "DerivedData", "Pods", "node_modules", ".git", "Carthage",
-            "dist", "target", ".next", ".turbo", "__pycache__", ".venv", "vendor",
-        ])
+        let skip = BackendRunner.skipDirectoryNames
 
         var counts: [String: Int] = Dictionary(uniqueKeysWithValues: plugins.map { ($0.id, 0) })
         var fileCounts: [String: Int] = Dictionary(uniqueKeysWithValues: plugins.map { ($0.id, 0) })

@@ -140,6 +140,12 @@ final class GraphAppModel: ObservableObject {
         screen = .build
     }
 
+    func cancelBuild() {
+        BackendRunner.cancelActiveAnalyze()
+        buildProgressLabel = "Cancelling…"
+        status = "Cancelling build…"
+    }
+
     // MARK: - Backends / analyze
 
     func installSelectedBackend() {
@@ -182,6 +188,7 @@ final class GraphAppModel: ObservableObject {
         if isBusy { return }
 
         isBusy = true
+        BackendRunner.resetCancelFlag()
         buildProgressLabel = fullBuild ? "Building all languages…" : "Checking graph updates…"
         status = "\(buildProgressLabel) (\(reason))"
 
@@ -190,15 +197,29 @@ final class GraphAppModel: ObservableObject {
 
         DispatchQueue.global(qos: .userInitiated).async {
             var errors: [String] = []
+            var cancelled = false
             for (i, plugin) in plugins.enumerated() {
                 DispatchQueue.main.async {
                     self.buildProgressLabel = "[\(i + 1)/\(plugins.count)] \(plugin.name)…"
                 }
                 do {
                     _ = try BackendRunner.analyze(projectRoot: root, plugin: plugin)
+                } catch BackendError.cancelled {
+                    cancelled = true
+                    errors.append("\(plugin.name): cancelled")
+                    break
                 } catch {
                     errors.append("\(plugin.name): \(error.localizedDescription)")
                 }
+            }
+
+            if cancelled {
+                DispatchQueue.main.async {
+                    self.isBusy = false
+                    self.buildProgressLabel = "Cancelled"
+                    self.status = "Build cancelled. Partial: " + (errors.isEmpty ? "none" : errors.joined(separator: "; "))
+                }
+                return
             }
 
             do {
