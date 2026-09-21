@@ -17,37 +17,76 @@ enum LanguageDetect {
             case .noPlugins:
                 return "Không tìm thấy backend plugin nào trên máy. Clone vào ~/Documents/Code/code-prism/backends/*-prism hoặc Install backend."
             case .none(let root):
-                let plugins = PluginDiscovery.discover()
+                let plugins = PluginDiscovery.discover().filter(\.canDetectLanguage)
                 let langs = plugins.map(\.name).joined(separator: " / ")
                 return "Không nhận diện được ngôn ngữ trong “\(root.lastPathComponent)”. Plugin hiện có: \(langs.isEmpty ? "(không có)" : langs)."
             }
         }
     }
 
+    /// Extra junk dirs beyond BackendRunner.skip — keep detect fast on monorepos.
+    private static let extraSkip: Set<String> = [
+        ".cache", "CMakeFiles", "cmake-build-debug", "cmake-build-release",
+        "out", "output", "xcuserdata", "Pods", "Carthage",
+    ]
+
     /// Detect languages using **discovered plugins only**.
-    /// Files for languages without a plugin (e.g. `.lua` with no lua-prism) are ignored —
-    /// no fake detection and no SoT/nodes for them.
+    /// Unknown extensions (no plugin) are ignored. Large monorepos use a shallow
+    /// pass first so roots like marlin-language light up without walking all of build/.
     static func detectAll(projectRoot: URL, plugins: [DiscoveredPlugin]? = nil) throws -> [Result] {
         let plugins = (plugins ?? PluginDiscovery.discover()).filter(\.canDetectLanguage)
         guard !plugins.isEmpty else { throw DetectError.noPlugins }
 
+        // 1) Fast shallow pass (company roots: mpm/, libraries/, projects/, …)
+        let shallow = scan(
+            projectRoot: projectRoot,
+            plugins: plugins,
+            maxDepth: 6,
+            fileCap: 40_000
+        )
+        if !shallow.isEmpty { return shallow }
+
+        // 2) Deeper fallback for unusual layouts
+        let deep = scan(
+            projectRoot: projectRoot,
+            plugins: plugins,
+            maxDepth: 16,
+            fileCap: 120_000
+        )
+        guard !deep.isEmpty else { throw DetectError.none(projectRoot) }
+        return deep
+    }
+
+    private static func scan(
+        projectRoot: URL,
+        plugins: [DiscoveredPlugin],
+        maxDepth: Int,
+        fileCap: Int
+    ) -> [Result] {
         let fm = FileManager.default
-        let skip = BackendRunner.skipDirectoryNames
+        let skip = BackendRunner.skipDirectoryNames.union(extraSkip)
 
         var counts: [String: Int] = Dictionary(uniqueKeysWithValues: plugins.map { ($0.id, 0) })
         var fileCounts: [String: Int] = Dictionary(uniqueKeysWithValues: plugins.map { ($0.id, 0) })
         var markersHit: [String: [String]] = [:]
 
-        // Markers (plugin-declared only)
+        // Markers: root file, then shallow search (Application.marlin often under projects/)
         for plugin in plugins {
             for marker in plugin.markers {
-                let url = projectRoot.appendingPathComponent(marker)
-                if fm.fileExists(atPath: url.path) {
+                let rootHit = projectRoot.appendingPathComponent(marker)
+                if fm.fileExists(atPath: rootHit.path) {
                     counts[plugin.id, default: 0] += 50
                     markersHit[plugin.id, default: []].append(marker)
+                } else if let rel = findNamed(
+                    marker,
+                    under: projectRoot,
+                    maxDepth: min(4, maxDepth),
+                    skip: skip
+                ) {
+                    counts[plugin.id, default: 0] += 50
+                    markersHit[plugin.id, default: []].append("\(rel)")
                 }
             }
-            // Extra: xcodeproj for plugins that include "swift"
             if plugin.extensions.contains("swift"),
                let items = try? fm.contentsOfDirectory(atPath: projectRoot.path),
                items.contains(where: { $0.hasSuffix(".xcodeproj") || $0.hasSuffix(".xcworkspace") }) {
@@ -56,41 +95,24 @@ enum LanguageDetect {
             }
         }
 
-        let extToLang: [String: String] = {
-            var map: [String: String] = [:]
-            for plugin in plugins {
-                for ext in plugin.extensions {
-                    // First plugin wins for shared exts like .h — prefer more specific later by score
-                    if map[ext] == nil { map[ext] = plugin.id }
-                }
+        var extToLang: [String: String] = [:]
+        for plugin in plugins {
+            for ext in plugin.extensions where extToLang[ext] == nil {
+                extToLang[ext] = plugin.id
             }
-            // Prefer objc for .h when objc plugin exists and we'll boost via .m/.mm
-            if plugins.contains(where: { $0.id == "objc" }) {
-                // keep .h as cpp if both claim it; objc boost handles .m/.mm projects
-            }
-            return map
-        }()
-
-        // If both cpp and objc claim "h", map h → cpp by default; objc gets boost from m/mm
-        var headerCount = 0
-        guard let enumerator = fm.enumerator(
-            at: projectRoot,
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
-        ) else {
-            throw DetectError.none(projectRoot)
         }
 
-        for case let url as URL in enumerator {
-            if skip.contains(where: { url.pathComponents.contains($0) }) {
-                enumerator.skipDescendants()
-                continue
-            }
+        var headerCount = 0
+        var seenFiles = 0
+        walkFiles(projectRoot: projectRoot, maxDepth: maxDepth, skip: skip) { url in
+            if seenFiles >= fileCap { return false }
+            seenFiles += 1
             let ext = url.pathExtension.lowercased()
             if ext == "h" { headerCount += 1 }
-            guard let lang = extToLang[ext] else { continue }
+            guard let lang = extToLang[ext] else { return true }
             counts[lang, default: 0] += 1
             fileCounts[lang, default: 0] += 1
+            return true
         }
         if counts["objc", default: 0] > 0, headerCount > 0 {
             counts["objc", default: 0] += min(headerCount, counts["objc", default: 0])
@@ -119,9 +141,65 @@ enum LanguageDetect {
                 )
             )
         }
-
         results.sort { $0.score > $1.score }
-        guard !results.isEmpty else { throw DetectError.none(projectRoot) }
         return results
+    }
+
+    /// Recursive file walk with depth limit; `body` return false to abort.
+    private static func walkFiles(
+        projectRoot: URL,
+        maxDepth: Int,
+        skip: Set<String>,
+        body: (URL) -> Bool
+    ) {
+        let fm = FileManager.default
+        var stop = false
+        func go(_ dir: URL, depth: Int) {
+            guard !stop, depth <= maxDepth else { return }
+            guard let entries = try? fm.contentsOfDirectory(
+                at: dir,
+                includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            ) else { return }
+            for url in entries {
+                if stop { return }
+                let name = url.lastPathComponent
+                if skip.contains(name) { continue }
+                var isDir: ObjCBool = false
+                guard fm.fileExists(atPath: url.path, isDirectory: &isDir) else { continue }
+                if isDir.boolValue {
+                    go(url, depth: depth + 1)
+                } else if !body(url) {
+                    stop = true
+                    return
+                }
+            }
+        }
+        go(projectRoot, depth: 0)
+    }
+
+    private static func findNamed(
+        _ fileName: String,
+        under root: URL,
+        maxDepth: Int,
+        skip: Set<String>
+    ) -> String? {
+        var found: String?
+        let rootPath = root.path
+        walkFiles(projectRoot: root, maxDepth: maxDepth, skip: skip) { url in
+            if url.lastPathComponent == fileName {
+                let path = url.path
+                if path.hasPrefix(rootPath) {
+                    var rel = String(path.dropFirst(rootPath.count))
+                    if rel.hasPrefix("/") { rel.removeFirst() }
+                    found = rel
+                } else {
+                    found = fileName
+                }
+                return false
+            }
+            return true
+        }
+        return found
     }
 }

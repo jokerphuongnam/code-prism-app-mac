@@ -48,7 +48,7 @@ enum BackendRunner {
         ".build", "DerivedData", "Pods", "node_modules", ".git", "Carthage",
         "dist", "target", ".next", ".turbo", "__pycache__", ".venv", "vendor",
         ".agents", "Generated", "generated", ".swiftpm", "xcuserdata",
-        "build", "Checkouts",
+        "build", "Checkouts", ".cache", "CMakeFiles", "out",
     ]
 
     private static let processLock = NSLock()

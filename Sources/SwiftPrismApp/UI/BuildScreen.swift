@@ -13,10 +13,24 @@ struct BuildScreen: View {
             Text(model.projectRoot?.lastPathComponent ?? "Project")
                 .font(.title.weight(.semibold))
 
-            if model.detectedLanguages.isEmpty {
+            if model.isBusy, model.detectedLanguages.isEmpty {
+                VStack(spacing: 12) {
+                    ProgressView(model.buildProgressLabel)
+                    Text(model.status)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Text("Company monorepos (marlin-language, …) scan plugins only — may take a few seconds.")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: 480)
+            } else if model.detectedLanguages.isEmpty {
                 Text(model.status)
                     .foregroundStyle(.red)
                     .multilineTextAlignment(.center)
+                    .frame(maxWidth: 520)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Detected languages")
