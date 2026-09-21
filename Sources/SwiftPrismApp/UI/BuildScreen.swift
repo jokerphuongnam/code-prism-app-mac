@@ -35,7 +35,7 @@ struct BuildScreen: View {
                 }
                 .frame(maxWidth: 480, alignment: .leading)
 
-                Text("SoT is written to ~/Library/Caches/code-prism/<project>-<hash>/{lang}-prism/\n(not into this project folder).")
+                Text("Only languages with a Code Prism plugin are detected/built.\nUnknown langs (e.g. Lua without lua-prism) are ignored — no nodes.\nSoT → ~/Library/Caches/code-prism/<project>-<hash>/{lang}-prism/")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

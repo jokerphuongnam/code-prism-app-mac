@@ -24,9 +24,11 @@ enum LanguageDetect {
         }
     }
 
-    /// Detect languages using **discovered plugins** only (extensions + markers from manifests).
+    /// Detect languages using **discovered plugins only**.
+    /// Files for languages without a plugin (e.g. `.lua` with no lua-prism) are ignored —
+    /// no fake detection and no SoT/nodes for them.
     static func detectAll(projectRoot: URL, plugins: [DiscoveredPlugin]? = nil) throws -> [Result] {
-        let plugins = plugins ?? PluginDiscovery.discover()
+        let plugins = (plugins ?? PluginDiscovery.discover()).filter(\.canDetectLanguage)
         guard !plugins.isEmpty else { throw DetectError.noPlugins }
 
         let fm = FileManager.default
@@ -36,7 +38,7 @@ enum LanguageDetect {
         var fileCounts: [String: Int] = Dictionary(uniqueKeysWithValues: plugins.map { ($0.id, 0) })
         var markersHit: [String: [String]] = [:]
 
-        // Markers
+        // Markers (plugin-declared only)
         for plugin in plugins {
             for marker in plugin.markers {
                 let url = projectRoot.appendingPathComponent(marker)

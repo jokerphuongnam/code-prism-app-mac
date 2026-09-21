@@ -16,6 +16,12 @@ struct DiscoveredPlugin: Identifiable, Equatable, Hashable {
     var isExecutable: Bool {
         FileManager.default.isExecutableFile(atPath: binaryURL.path)
     }
+
+    /// Can participate in detect/build — must declare extensions and/or markers in the plugin manifest.
+    /// A random `*-prism` folder with an empty heuristic stub does not claim languages.
+    var canDetectLanguage: Bool {
+        !extensions.isEmpty || !markers.isEmpty
+    }
 }
 
 enum PluginDiscovery {

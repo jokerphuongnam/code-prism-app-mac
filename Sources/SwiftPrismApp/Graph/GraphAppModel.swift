@@ -47,8 +47,9 @@ final class GraphAppModel: ObservableObject {
         bookmarks = store
     }
 
+    /// Backends to build: intersection of detected langs ∩ installed plugins (no plugin ⇒ never built).
     var selectedBackends: [BackendPlugin] {
-        let plugins = PluginDiscovery.discover()
+        let plugins = PluginDiscovery.discover().filter(\.canDetectLanguage)
         return detectedLanguageIds.compactMap { id in plugins.first { $0.id == id } }
     }
 

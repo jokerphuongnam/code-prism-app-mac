@@ -19,15 +19,6 @@ enum IslandLayout {
         "__pycache__", ".next", "xcuserdata",
     ]
 
-    private static let extToLang: [String: String] = [
-        "swift": "swift", "m": "objc", "mm": "objc",
-        "h": "cpp", "hpp": "cpp", "c": "cpp", "cc": "cpp", "cpp": "cpp", "cxx": "cpp",
-        "kt": "kotlin", "kts": "kotlin", "java": "kotlin",
-        "rs": "rust", "go": "go",
-        "js": "js", "jsx": "js", "ts": "js", "tsx": "js",
-        "marlin": "marlin", "marlinheader": "marlin",
-    ]
-
     /// Project slice only, e.g. `mpm`, `libraries`, `projects/desk-garden`.
     static func projectKey(filePath: String, projectRoot: String) -> String {
         let path = (filePath as NSString).standardizingPath
@@ -47,6 +38,8 @@ enum IslandLayout {
         return first
     }
 
+    /// Language only from SoT / merge prefix — never invent langs from file extensions
+    /// (extensions without a plugin must not become islands or nodes).
     static func languageKey(for node: GraphNode) -> String {
         if !node.language.isEmpty { return node.language }
         // Merged multi-lang ids: `swift::Foo.bar`
@@ -59,8 +52,6 @@ enum IslandLayout {
             let tag = String(node.name[node.name.index(after: node.name.startIndex)..<end])
             if !tag.isEmpty { return tag }
         }
-        let ext = (node.filePath as NSString).pathExtension.lowercased()
-        if let lang = extToLang[ext] { return lang }
         return ""
     }
 
