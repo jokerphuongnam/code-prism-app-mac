@@ -86,7 +86,17 @@ struct GraphSceneView: NSViewRepresentable {
         private var graph: GraphDocument = .empty
         private weak var cameraNode: SCNNode?
         private weak var pivotNode: SCNNode?
+        private weak var graphRoot: SCNNode?
         private var baseCameraDistance: Float = 16
+        private var selectedId: String?
+        private var visibleIds: Set<String> = []
+        private var nodeById: [String: GraphNode] = [:]
+        private var cullFrameCounter = 0
+        /// Max SceneKit node instances mounted for the current frustum.
+        private let maxBufferedNodes = 320
+        /// Labels only when the viewport is sparse enough (billboards are expensive).
+        private let maxLabeledNodes = 56
+        private let viewportMargin: CGFloat = 96
 
         // Orbit state (radians). Drag sticks to mouse; light inertia on release.
         private var yaw: Float = 0.55
@@ -148,6 +158,10 @@ struct GraphSceneView: NSViewRepresentable {
 
             // Apply immediately while dragging — no rubber-band lag behind the cursor.
             applyCameraTransform(yaw: yaw, pitch: pitch, radius: smoothRadius)
+            cullFrameCounter += 1
+            if cullFrameCounter % 2 == 0 {
+                syncVisibleBuffer(force: false)
+            }
         }
 
         func startDisplayLink() {
@@ -217,6 +231,11 @@ struct GraphSceneView: NSViewRepresentable {
             smoothRadius += (targetRadius - smoothRadius) * rAlpha
 
             applyCameraTransform(yaw: yaw, pitch: pitch, radius: smoothRadius)
+            // Orbit changes the frustum — refresh the visible node buffer.
+            cullFrameCounter += 1
+            if cullFrameCounter % 2 == 0 {
+                syncVisibleBuffer(force: false)
+            }
         }
 
         private func applyCameraTransform(yaw: Float, pitch: Float, radius: Float) {
@@ -231,10 +250,14 @@ struct GraphSceneView: NSViewRepresentable {
         func rebuild(document: GraphDocument, selectedId: String?, zoom: CGFloat) {
             layoutTimer?.invalidate()
             graph = document
+            self.selectedId = selectedId
             documentSignature =
                 "\(document.nodes.count)|\(document.links.count)|\(document.generatedAt)|\(document.projectRoot)"
             externalZoom = zoom
             targetZoom = zoom
+            visibleIds.removeAll(keepingCapacity: true)
+            nodeMap.removeAll(keepingCapacity: true)
+            nodeById = Dictionary(uniqueKeysWithValues: document.nodes.map { ($0.id, $0) })
 
             let scene = SCNScene()
             scene.background.contents = NSColor(calibratedWhite: 0.07, alpha: 1)
@@ -248,7 +271,8 @@ struct GraphSceneView: NSViewRepresentable {
             camera.camera?.zNear = 0.05
             camera.camera?.zFar = 800
             camera.camera?.fieldOfView = 50
-            baseCameraDistance = max(12, Float(document.nodes.count) * 0.38 + 10)
+            let nCount = max(document.nodes.count, 1)
+            baseCameraDistance = max(12, min(80, Float(nCount) * 0.22 + 10))
             smoothRadius = baseCameraDistance / Float(max(zoom, 0.2))
             camera.position = SCNVector3(0, 0, smoothRadius)
             pivot.addChildNode(camera)
@@ -270,71 +294,150 @@ struct GraphSceneView: NSViewRepresentable {
             key.eulerAngles = SCNVector3(-0.55, 0.45, 0)
             scene.rootNode.addChildNode(key)
 
-            nodeMap.removeAll()
             let ids = document.nodes.map(\.id)
             let linkPairs = document.links.map { ($0.source, $0.target) }
             let force = ForceLayout3D(nodeIds: ids, links: linkPairs)
-            force.linkDistance = 4.2
-            force.charge = -42
-            for _ in 0..<110 {
+            force.linkDistance = nCount > 400 ? 3.4 : 4.2
+            // O(n²) charge melts large graphs — disable above threshold.
+            force.charge = nCount > 350 ? 0 : -42
+            let warm = nCount > 500 ? 28 : (nCount > 200 ? 55 : 110)
+            for _ in 0..<warm {
                 _ = force.tick(1)
             }
             layout = force
 
             let root = SCNNode()
             root.name = "graphRoot"
-
-            for n in document.nodes {
-                let geo = NodeGeometry.makeGeometry(flavor: n.flavor)
-                let node = SCNNode(geometry: geo)
-                node.name = n.id
-                if let p = force.positions[n.id] {
-                    node.simdPosition = p
-                }
-                let label = makeBillboardLabel(shortName(n.name))
-                label.position = SCNVector3(0, 0.55, 0)
-                node.addChildNode(label)
-                root.addChildNode(node)
-                nodeMap[n.id] = node
-            }
-
-            for link in document.links {
-                guard let a = force.positions[link.source], let b = force.positions[link.target] else { continue }
-                let line = NodeGeometry.makeLinkNode(from: a, to: b, kind: link.kind)
-                line.name = "link:\(link.id)"
-                root.addChildNode(line)
-            }
-
             scene.rootNode.addChildNode(root)
+            graphRoot = root
+
             view?.scene = scene
             view?.pointOfView = camera
+            // Mount only what the camera can see (viewport buffer).
+            syncVisibleBuffer(force: true)
             updateSelection(selectedId)
 
             var ticks = 0
+            let maxTicks = nCount > 400 ? 40 : 100
             layoutTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] t in
                 guard let self, let layout = self.layout else {
                     t.invalidate()
                     return
                 }
-                let e = layout.tick(2)
+                let e = layout.tick(nCount > 400 ? 1 : 2)
                 for (id, node) in self.nodeMap {
                     if let p = layout.positions[id] {
                         node.simdPosition = p
                     }
                 }
                 ticks += 1
-                if ticks % 3 == 0 {
-                    self.refreshLinks(in: root, layout: layout)
+                if ticks % 4 == 0 {
+                    self.syncVisibleBuffer(force: false)
                 }
-                if e < 0.002 || ticks > 100 {
+                if e < 0.002 || ticks > maxTicks {
                     t.invalidate()
-                    self.refreshLinks(in: root, layout: layout)
+                    self.syncVisibleBuffer(force: true)
                 }
             }
 
             if displayLink == nil {
                 startDisplayLink()
             }
+        }
+
+        /// Keep only frustum-visible (and near) nodes mounted in SceneKit.
+        private func syncVisibleBuffer(force: Bool) {
+            guard let view, let layout, let root = graphRoot else { return }
+            let bounds = view.bounds
+            guard bounds.width > 1, bounds.height > 1 else { return }
+
+            struct Cand {
+                let id: String
+                let screenDist2: CGFloat
+                let camDist2: Float
+                let pos: SIMD3<Float>
+            }
+
+            let cx = bounds.midX
+            let cy = bounds.midY
+            var candidates: [Cand] = []
+            candidates.reserveCapacity(min(graph.nodes.count, maxBufferedNodes * 2))
+
+            let camWorld = cameraNode?.worldPosition ?? SCNVector3(0, 0, smoothRadius)
+            let camPos = SIMD3<Float>(Float(camWorld.x), Float(camWorld.y), Float(camWorld.z))
+
+            for n in graph.nodes {
+                guard let p = layout.positions[n.id] else { continue }
+                let projected = view.projectPoint(SCNVector3(p.x, p.y, p.z))
+                // SceneKit: z in (0, 1) ≈ in front of camera / in clip volume.
+                let inDepth = projected.z > 0 && projected.z < 1
+                let inXY =
+                    projected.x >= -viewportMargin
+                    && projected.x <= bounds.width + viewportMargin
+                    && projected.y >= -viewportMargin
+                    && projected.y <= bounds.height + viewportMargin
+                if !(inDepth && inXY) { continue }
+                let dx = projected.x - cx
+                let dy = projected.y - cy
+                let screenDist2 = dx * dx + dy * dy
+                let delta = p - camPos
+                let camDist2 = simd_length_squared(delta)
+                candidates.append(Cand(id: n.id, screenDist2: screenDist2, camDist2: camDist2, pos: p))
+            }
+
+            // Prefer near-camera / center-of-screen when the frustum is dense.
+            candidates.sort {
+                if $0.camDist2 != $1.camDist2 { return $0.camDist2 < $1.camDist2 }
+                return $0.screenDist2 < $1.screenDist2
+            }
+            if candidates.count > maxBufferedNodes {
+                candidates = Array(candidates.prefix(maxBufferedNodes))
+            }
+            if let sel = selectedId, let p = layout.positions[sel], !candidates.contains(where: { $0.id == sel }) {
+                candidates.insert(Cand(id: sel, screenDist2: 0, camDist2: 0, pos: p), at: 0)
+                if candidates.count > maxBufferedNodes {
+                    candidates = Array(candidates.prefix(maxBufferedNodes))
+                }
+            }
+
+            let nextVisible = Set(candidates.map(\.id))
+            if !force, nextVisible == visibleIds { return }
+
+            let labeledBudget = Set(candidates.prefix(maxLabeledNodes).map(\.id)).union(
+                selectedId.map { Set([$0]) } ?? []
+            )
+
+            // Remove nodes that left the buffer.
+            for id in visibleIds.subtracting(nextVisible) {
+                nodeMap[id]?.removeFromParentNode()
+                nodeMap[id] = nil
+            }
+
+            SCNTransaction.begin()
+            SCNTransaction.disableActions = true
+            for cand in candidates {
+                if let existing = nodeMap[cand.id] {
+                    existing.simdPosition = cand.pos
+                    continue
+                }
+                guard let meta = nodeById[cand.id] else { continue }
+                let geo = NodeGeometry.makeGeometry(flavor: meta.flavor)
+                let node = SCNNode(geometry: geo)
+                node.name = meta.id
+                node.simdPosition = cand.pos
+                if labeledBudget.contains(meta.id) {
+                    let label = makeBillboardLabel(shortName(meta.name))
+                    label.position = SCNVector3(0, 0.55, 0)
+                    node.addChildNode(label)
+                }
+                root.addChildNode(node)
+                nodeMap[meta.id] = node
+            }
+            SCNTransaction.commit()
+
+            visibleIds = nextVisible
+            refreshVisibleLinks(in: root, layout: layout, visible: nextVisible)
+            updateSelection(selectedId)
         }
 
         private func shortName(_ name: String) -> String {
@@ -390,20 +493,37 @@ struct GraphSceneView: NSViewRepresentable {
             return image
         }
 
-        private func refreshLinks(in root: SCNNode, layout: ForceLayout3D) {
+        private func refreshVisibleLinks(
+            in root: SCNNode,
+            layout: ForceLayout3D,
+            visible: Set<String>
+        ) {
             root.childNodes.filter { $0.name?.hasPrefix("link:") == true }.forEach {
                 $0.removeFromParentNode()
             }
+            // Only edges touching the buffered viewport (keeps draw calls bounded).
+            var drawn = 0
+            let maxLinks = maxBufferedNodes * 3
             for link in graph.links {
+                let aVisible = visible.contains(link.source)
+                let bVisible = visible.contains(link.target)
+                guard aVisible || bVisible else { continue }
                 guard let a = layout.positions[link.source], let b = layout.positions[link.target]
                 else { continue }
                 let line = NodeGeometry.makeLinkNode(from: a, to: b, kind: link.kind)
                 line.name = "link:\(link.id)"
                 root.addChildNode(line)
+                drawn += 1
+                if drawn >= maxLinks { break }
             }
         }
 
         func updateSelection(_ selectedId: String?) {
+            self.selectedId = selectedId
+            if let selectedId, !visibleIds.contains(selectedId) {
+                // Ensure selection is mounted even if outside the last frustum sample.
+                syncVisibleBuffer(force: true)
+            }
             for (id, node) in nodeMap {
                 let selected = id == selectedId
                 node.geometry?.firstMaterial?.emission.contents = selected
