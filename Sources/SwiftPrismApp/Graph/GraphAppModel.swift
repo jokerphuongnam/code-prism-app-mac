@@ -82,7 +82,10 @@ final class GraphAppModel: ObservableObject {
 
     init() {
         watcher.onChange = { [weak self] in
-            self?.analyze(fullBuild: false, reason: "file change")
+            guard let self else { return }
+            // Never stack incremental builds on top of an in-flight Build / Open storm.
+            guard !self.isBusy, self.screen == .graph else { return }
+            self.analyze(fullBuild: false, reason: "file change")
         }
     }
 
@@ -121,7 +124,9 @@ final class GraphAppModel: ObservableObject {
             if let doc = try? GraphLoader.loadMerged(projectRoot: url, languages: detectedLanguageIds) {
                 lastFingerprint = GraphFingerprint.from(doc)
             }
+            // Watch only after Open settles; start disabled until graph is shown / build ends.
             watcher.start(projectRoot: url)
+            watcher.isEnabled = false
         } catch {
             detectedLanguages = []
             document = .empty
@@ -134,9 +139,11 @@ final class GraphAppModel: ObservableObject {
     func showGraph() {
         tryLoadSoT()
         screen = .graph
+        watcher.isEnabled = true
     }
 
     func backToBuild() {
+        watcher.isEnabled = false
         screen = .build
     }
 
@@ -188,6 +195,7 @@ final class GraphAppModel: ObservableObject {
         if isBusy { return }
 
         isBusy = true
+        watcher.isEnabled = false
         BackendRunner.resetCancelFlag()
         buildProgressLabel = fullBuild ? "Building all languages…" : "Checking graph updates…"
         status = "\(buildProgressLabel) (\(reason))"
@@ -218,6 +226,7 @@ final class GraphAppModel: ObservableObject {
                     self.isBusy = false
                     self.buildProgressLabel = "Cancelled"
                     self.status = "Build cancelled. Partial: " + (errors.isEmpty ? "none" : errors.joined(separator: "; "))
+                    if self.screen == .graph { self.watcher.isEnabled = true }
                 }
                 return
             }
@@ -236,6 +245,7 @@ final class GraphAppModel: ObservableObject {
                         if self.screen == .build, self.hasCachedGraph {
                             self.document = doc
                         }
+                        if self.screen == .graph { self.watcher.isEnabled = true }
                         return
                     }
 
@@ -249,11 +259,14 @@ final class GraphAppModel: ObservableObject {
                     }
                     self.status = msg
                     self.screen = .graph
+                    // Re-enable watcher only after graph is up — avoid analyze→write→re-analyze loops.
+                    self.watcher.isEnabled = true
                 }
             } catch {
                 DispatchQueue.main.async {
                     self.isBusy = false
                     self.status = errors.isEmpty ? error.localizedDescription : errors.joined(separator: "; ")
+                    if self.screen == .graph { self.watcher.isEnabled = true }
                 }
             }
         }

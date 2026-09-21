@@ -114,9 +114,10 @@ final class GraphMetalHostView: NSView {
         mtk.colorPixelFormat = .bgra8Unorm
         mtk.depthStencilPixelFormat = .depth32Float
         mtk.clearColor = MTLClearColor(red: 0.07, green: 0.07, blue: 0.07, alpha: 1)
-        mtk.isPaused = false
-        mtk.enableSetNeedsDisplay = false
-        mtk.preferredFramesPerSecond = 60
+        // Start paused — renderer resumes only while orbiting / settling layout.
+        mtk.isPaused = true
+        mtk.enableSetNeedsDisplay = true
+        mtk.preferredFramesPerSecond = 30
         addSubview(mtk)
         metalView = mtk
         renderer = GraphMetalRenderer(device: device, view: mtk)
@@ -132,15 +133,27 @@ final class GraphMetalHostView: NSView {
 
     func load(document: GraphDocument) {
         renderer?.rebuild(document: document)
+        wakeRender()
     }
 
     func setZoom(_ zoom: CGFloat) {
-        renderer?.zoom = Float(zoom)
+        let z = Float(zoom)
+        guard abs((renderer?.zoom ?? z) - z) > 0.0005 else { return }
+        renderer?.zoom = z
+        wakeRender()
     }
 
     func setSelectedId(_ id: String?) {
+        guard renderer?.selectedId != id else { return }
         renderer?.selectedId = id
         renderer?.refreshSelectionColors()
+        wakeRender()
+    }
+
+    private func wakeRender() {
+        metalView?.isPaused = false
+        metalView?.preferredFramesPerSecond = 30
+        metalView?.setNeedsDisplay(metalView.bounds)
     }
 
     override var acceptsFirstResponder: Bool { true }
@@ -159,6 +172,7 @@ final class GraphMetalHostView: NSView {
     override func mouseDown(with event: NSEvent) {
         lastDrag = convert(event.locationInWindow, from: nil)
         didDrag = false
+        wakeRender()
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -167,6 +181,7 @@ final class GraphMetalHostView: NSView {
             let dx = Float(loc.x - last.x)
             let dy = Float(loc.y - last.y)
             if abs(dx) + abs(dy) > 0.5 { didDrag = true }
+            wakeRender()
             renderer?.orbit(dx: dx, dy: -dy)
         }
         lastDrag = loc
@@ -180,6 +195,7 @@ final class GraphMetalHostView: NSView {
     override func magnify(with event: NSEvent) {
         let m = event.magnification
         if abs(m) > 0.0005 {
+            wakeRender()
             onZoomDelta?(max(0.5, min(1.8, 1 + m * 1.45)))
         }
     }
@@ -188,10 +204,12 @@ final class GraphMetalHostView: NSView {
         switch gesture.state {
         case .began:
             lastGestureMagnification = 0
+            wakeRender()
         case .changed:
             let delta = gesture.magnification - lastGestureMagnification
             lastGestureMagnification = gesture.magnification
             if abs(delta) > 0.0005 {
+                wakeRender()
                 onZoomDelta?(max(0.5, min(1.8, 1 + delta * 1.45)))
             }
         default:
@@ -222,6 +240,7 @@ final class GraphMetalHostView: NSView {
             guard flags.contains(.command), !flags.contains(.control) else { return event }
             let dy = event.scrollingDeltaY
             if abs(dy) > 0.1 {
+                self.wakeRender()
                 self.onZoomDelta?(dy > 0 ? 1.08 : 0.92)
             }
             return nil
@@ -278,6 +297,8 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
 
     private var layout: ForceLayout3D?
     private var layoutWorkItem: DispatchWorkItem?
+    private weak var metalView: MTKView?
+    private var layoutSettling = false
 
     var selectedId: String?
     var zoom: Float = 1 {
@@ -296,9 +317,22 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
     init(device: MTLDevice, view: MTKView) {
         self.device = device
         self.queue = device.makeCommandQueue()!
+        self.metalView = view
         super.init()
         buildPipelines(view: view)
         uniformBuffer = device.makeBuffer(length: MemoryLayout<GPUUniforms>.stride, options: [.storageModeShared])
+    }
+
+    private func requestFrames() {
+        metalView?.isPaused = false
+        metalView?.preferredFramesPerSecond = 30
+    }
+
+    private func pauseIfIdle() {
+        let spinning = abs(yawVel) > 0.00008 || abs(pitchVel) > 0.00008
+        if !dragging && !spinning && !layoutSettling {
+            metalView?.isPaused = true
+        }
     }
 
     private func buildPipelines(view: MTKView) {
@@ -336,6 +370,8 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
 
     func rebuild(document: GraphDocument) {
         layoutWorkItem?.cancel()
+        layoutSettling = true
+        requestFrames()
         nodeIds = document.nodes.map(\.id)
         flavors = document.nodes.map(\.flavor)
         let idToIndex = Dictionary(uniqueKeysWithValues: nodeIds.enumerated().map { ($0.element, $0.offset) })
@@ -353,9 +389,9 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
         force.charge = n > 300 ? 0 : -36
         layout = force
 
-        // Warm a little on background so UI stays responsive.
-        let warm = n > 800 ? 12 : (n > 300 ? 30 : 80)
-        let settle = n > 400 ? 40 : 80
+        // Short background settle — few GPU uploads (avoids "breathing / zoom" thrash).
+        let warm = n > 800 ? 10 : (n > 300 ? 22 : 50)
+        let settle = n > 400 ? 24 : 40
         var work: DispatchWorkItem!
         work = DispatchWorkItem { [weak self] in
             guard let self, let layout = self.layout else { return }
@@ -363,26 +399,21 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
                 if work.isCancelled { return }
                 _ = layout.tick(1)
             }
-            let pos = self.nodeIds.map { layout.positions[$0] ?? .zero }
+            let midPos = self.nodeIds.map { layout.positions[$0] ?? .zero }
             DispatchQueue.main.async {
-                self.positions = pos
+                self.positions = midPos
                 self.uploadGPUBuffers()
             }
-            for i in 0..<settle {
+            for _ in 0..<settle {
                 if work.isCancelled { return }
                 _ = layout.tick(n > 400 ? 1 : 2)
-                if i % 8 == 0 {
-                    let pos2 = self.nodeIds.map { layout.positions[$0] ?? .zero }
-                    DispatchQueue.main.async {
-                        self.positions = pos2
-                        self.uploadGPUBuffers()
-                    }
-                }
             }
             let finalPos = self.nodeIds.map { layout.positions[$0] ?? .zero }
             DispatchQueue.main.async {
                 self.positions = finalPos
                 self.uploadGPUBuffers()
+                self.layoutSettling = false
+                self.pauseIfIdle()
             }
         }
         layoutWorkItem = work
@@ -402,6 +433,7 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
 
     func orbit(dx: Float, dy: Float) {
         dragging = true
+        requestFrames()
         let sens: Float = 0.0055
         yaw += dx * sens
         pitch = min(max(pitch + dy * sens, -1.2), 1.35)
@@ -413,6 +445,8 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
         dragging = false
         yawVel = min(max(yawVel, -0.25), 0.25)
         pitchVel = min(max(pitchVel, -0.25), 0.25)
+        // Keep a few frames for inertia, then pauseIfIdle in draw().
+        requestFrames()
     }
 
     private func uploadGPUBuffers() {
@@ -539,16 +573,21 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
             if abs(yawVel) > 0.00002 || abs(pitchVel) > 0.00002 {
                 yaw += yawVel * dt
                 pitch = min(max(pitch + pitchVel * dt, -1.2), 1.35)
-                let damp = exp(-8.5 * dt)
+                let damp = exp(-10.0 * dt)
                 yawVel *= damp
                 pitchVel *= damp
+                if abs(yawVel) < 0.00008 { yawVel = 0 }
+                if abs(pitchVel) < 0.00008 { pitchVel = 0 }
             }
         }
 
         guard let drawable = view.currentDrawable,
               let rpd = view.currentRenderPassDescriptor,
               let ub = uniformBuffer
-        else { return }
+        else {
+            pauseIfIdle()
+            return
+        }
 
         let w = Float(view.drawableSize.width)
         let h = max(Float(view.drawableSize.height), 1)
@@ -580,6 +619,7 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
         enc.endEncoding()
         cmd.present(drawable)
         cmd.commit()
+        pauseIfIdle()
     }
 
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
