@@ -11,6 +11,7 @@
 		08F5AD5BF7A2523F614B4C74 /* BuildScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 139E4CB44D77DECA71659986 /* BuildScreen.swift */; };
 		0ACC7A9FB398E05711331608 /* LanguageDetect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EABA41B0280E1CD8D0976EC /* LanguageDetect.swift */; };
 		18DA3EEAEAF06EC39084A45B /* GraphLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53173912AFA322EA7E7E8ED /* GraphLoader.swift */; };
+		1F84FBE9F26F02D82839AF49 /* GraphMetalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A594600BB91390C21E0119 /* GraphMetalView.swift */; };
 		1FE4E68B2CA82C367960D88A /* DemoPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98ACBFF84C553A88F52549DD /* DemoPaths.swift */; };
 		21EF0993105B6146F589FCCF /* SoTCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13BAE55D6FE59DF0B3E676EB /* SoTCache.swift */; };
 		325AE34970AEAA944BB304C2 /* WelcomeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2689665BE7F6AAA3C68D986F /* WelcomeScreen.swift */; };
@@ -27,10 +28,12 @@
 		B6D3F54767878C1768867C85 /* BackendPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A25EA757E5BC1D7F8254277 /* BackendPlugin.swift */; };
 		BB6DB7E814D7E8F5EC1AD8DD /* SwiftPrismApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD060DA8EF71CF3C9D7F747 /* SwiftPrismApp.swift */; };
 		DD64433BD5BC119B6CAFF570 /* GraphModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B75145A6ACC033381925292A /* GraphModels.swift */; };
+		F36627B08BC01605DB37A7F3 /* GraphShaderSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5A9E399ED584A00B585644 /* GraphShaderSource.swift */; };
 		F728D33448CCBE0D2CECAE36 /* ProjectRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 558194B2E1A87C41D81D27DE /* ProjectRootView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		01A594600BB91390C21E0119 /* GraphMetalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphMetalView.swift; sourceTree = "<group>"; };
 		0EABA41B0280E1CD8D0976EC /* LanguageDetect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageDetect.swift; sourceTree = "<group>"; };
 		139E4CB44D77DECA71659986 /* BuildScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildScreen.swift; sourceTree = "<group>"; };
 		13BAE55D6FE59DF0B3E676EB /* SoTCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoTCache.swift; sourceTree = "<group>"; };
@@ -41,6 +44,7 @@
 		558194B2E1A87C41D81D27DE /* ProjectRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRootView.swift; sourceTree = "<group>"; };
 		586DED365D5B90A6FC7C5E12 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		5B1E51A6B3206273CF6AD5C6 /* ProjectWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectWatcher.swift; sourceTree = "<group>"; };
+		7B5A9E399ED584A00B585644 /* GraphShaderSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphShaderSource.swift; sourceTree = "<group>"; };
 		7CB967A8DD0656CA8D1E6D66 /* GraphFingerprint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphFingerprint.swift; sourceTree = "<group>"; };
 		9811EDADCFE502AB6AB5FF33 /* GraphSceneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphSceneView.swift; sourceTree = "<group>"; };
 		98ACBFF84C553A88F52549DD /* DemoPaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoPaths.swift; sourceTree = "<group>"; };
@@ -73,11 +77,21 @@
 			children = (
 				ABD060DA8EF71CF3C9D7F747 /* SwiftPrismApp.swift */,
 				3A76C951A3F8026B7E4EA105 /* Graph */,
+				524485C2718632D6F549A26A /* Metal */,
 				77377B792FA3E0044D85296C /* Scene */,
 				73E9D979960C6ECD5556CE18 /* Services */,
 				96894C0D696121146B983B94 /* UI */,
 			);
 			path = SwiftPrismApp;
+			sourceTree = "<group>";
+		};
+		524485C2718632D6F549A26A /* Metal */ = {
+			isa = PBXGroup;
+			children = (
+				01A594600BB91390C21E0119 /* GraphMetalView.swift */,
+				7B5A9E399ED584A00B585644 /* GraphShaderSource.swift */,
+			);
+			path = Metal;
 			sourceTree = "<group>";
 		};
 		6E489C6F934254967E25DB15 /* Sources */ = {
@@ -208,8 +222,10 @@
 				3EA750FE5D7F5A7F6969DBAD /* GraphAppModel.swift in Sources */,
 				4C08E69AC93FA6CBE123BD47 /* GraphFingerprint.swift in Sources */,
 				18DA3EEAEAF06EC39084A45B /* GraphLoader.swift in Sources */,
+				1F84FBE9F26F02D82839AF49 /* GraphMetalView.swift in Sources */,
 				DD64433BD5BC119B6CAFF570 /* GraphModels.swift in Sources */,
 				A25E74E98239985B771FB89F /* GraphSceneView.swift in Sources */,
+				F36627B08BC01605DB37A7F3 /* GraphShaderSource.swift in Sources */,
 				3E79D3DD3F0B062B8F96C690 /* InspectorPanel.swift in Sources */,
 				0ACC7A9FB398E05711331608 /* LanguageDetect.swift in Sources */,
 				5172F38EBAE250A6DF331BB6 /* NodeGeometry.swift in Sources */,

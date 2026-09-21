@@ -135,7 +135,7 @@ struct ContentView: View {
                     description: Text("Go back to Build and run Build into cache.")
                 )
             } else {
-                GraphSceneView(
+                GraphMetalView(
                     document: model.document,
                     selectedId: model.selectedId,
                     zoom: model.graphZoom,
