@@ -25,6 +25,7 @@
 		5172F38EBAE250A6DF331BB6 /* NodeGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC506CAC35E25F7753C7B4EF /* NodeGeometry.swift */; };
 		5B3BDAEEB0A3E5D1BDB078D6 /* IslandLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 957675AD2426FA38A844DA9B /* IslandLayout.swift */; };
 		7877EDE264601AF6B6AF33DD /* ProjectWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1E51A6B3206273CF6AD5C6 /* ProjectWatcher.swift */; };
+		7C7B53569635D2010C3D73C6 /* WindowRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61F2F7404805343F849DAAD1 /* WindowRouter.swift */; };
 		A25E74E98239985B771FB89F /* GraphSceneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9811EDADCFE502AB6AB5FF33 /* GraphSceneView.swift */; };
 		B6D3F54767878C1768867C85 /* BackendPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A25EA757E5BC1D7F8254277 /* BackendPlugin.swift */; };
 		BB6DB7E814D7E8F5EC1AD8DD /* SwiftPrismApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD060DA8EF71CF3C9D7F747 /* SwiftPrismApp.swift */; };
@@ -45,6 +46,7 @@
 		558194B2E1A87C41D81D27DE /* ProjectRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRootView.swift; sourceTree = "<group>"; };
 		586DED365D5B90A6FC7C5E12 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		5B1E51A6B3206273CF6AD5C6 /* ProjectWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectWatcher.swift; sourceTree = "<group>"; };
+		61F2F7404805343F849DAAD1 /* WindowRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowRouter.swift; sourceTree = "<group>"; };
 		7B5A9E399ED584A00B585644 /* GraphShaderSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphShaderSource.swift; sourceTree = "<group>"; };
 		7CB967A8DD0656CA8D1E6D66 /* GraphFingerprint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphFingerprint.swift; sourceTree = "<group>"; };
 		957675AD2426FA38A844DA9B /* IslandLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandLayout.swift; sourceTree = "<group>"; };
@@ -115,6 +117,7 @@
 				B9D736EB5F4A2AF442682D76 /* PluginDiscovery.swift */,
 				5B1E51A6B3206273CF6AD5C6 /* ProjectWatcher.swift */,
 				13BAE55D6FE59DF0B3E676EB /* SoTCache.swift */,
+				61F2F7404805343F849DAAD1 /* WindowRouter.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -239,6 +242,7 @@
 				21EF0993105B6146F589FCCF /* SoTCache.swift in Sources */,
 				BB6DB7E814D7E8F5EC1AD8DD /* SwiftPrismApp.swift in Sources */,
 				325AE34970AEAA944BB304C2 /* WelcomeScreen.swift in Sources */,
+				7C7B53569635D2010C3D73C6 /* WindowRouter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

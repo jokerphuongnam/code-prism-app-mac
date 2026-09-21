@@ -18,11 +18,14 @@ struct ContentView: View {
         .toolbar {
             ToolbarItemGroup {
                 Button("Projects") {
-                    openWindow(id: "bookmarks")
+                    WindowRouter.focusBookmarks()
                 }
                 Button("Open Other…") {
                     if let url = bookmarks.pickAndRemember() {
-                        openWindow(id: "project", value: url)
+                        let id = ProjectWindowID(url: url)
+                        if !WindowRouter.focusProject(id: id) {
+                            openWindow(id: WindowRouter.projectWindowId, value: id)
+                        }
                     }
                 }
                 if model.screen == .graph {

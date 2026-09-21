@@ -4,11 +4,17 @@ import SwiftUI
 struct SwiftPrismApp: App {
     @StateObject private var bookmarks = BookmarkStore()
 
+    init() {
+        // Avoid macOS restoring a stack of stale project windows from prior debug launches.
+        UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
+    }
+
     var body: some Scene {
-        // Home: bookmark / source-tree window
-        Window("Projects", id: "bookmarks") {
+        // Singular home / onboarding — only one of these.
+        Window("Projects", id: WindowRouter.bookmarksWindowId) {
             BookmarkWindow()
                 .environmentObject(bookmarks)
+                .background(WindowPathMarker(isBookmarks: true))
         }
         .defaultSize(width: 520, height: 560)
         .commands {
@@ -20,11 +26,12 @@ struct SwiftPrismApp: App {
             }
         }
 
-        // One window per project
-        WindowGroup("Project", id: "project", for: URL.self) { $url in
-            if let url {
-                ProjectRootView(projectURL: url)
+        // One window per project path (stable ProjectWindowID, not raw URL).
+        WindowGroup(id: WindowRouter.projectWindowId, for: ProjectWindowID.self) { $id in
+            if let id {
+                ProjectRootView(projectURL: id.url)
                     .environmentObject(bookmarks)
+                    .background(WindowPathMarker(path: id.path))
             } else {
                 Text("No project")
                     .frame(minWidth: 400, minHeight: 300)

@@ -1,6 +1,8 @@
+import AppKit
 import SwiftUI
 
-/// Home window: bookmark / source-tree list. Opening a project spawns another window.
+/// Home / onboarding window (singular). Opening a project focuses an existing
+/// project window when possible — never stacks duplicates for the same path.
 struct BookmarkWindow: View {
     @EnvironmentObject private var bookmarks: BookmarkStore
     @Environment(\.openWindow) private var openWindow
@@ -67,6 +69,15 @@ struct BookmarkWindow: View {
                 openProject(url)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .codePrismFocusBookmarks)) { _ in
+            openWindow(id: WindowRouter.bookmarksWindowId)
+        }
+        .onAppear {
+            // Dismiss accidental extra "Projects" windows from older builds / restores.
+            DispatchQueue.main.async {
+                Self.collapseExtraBookmarksWindows()
+            }
+        }
     }
 
     private var header: some View {
@@ -77,7 +88,7 @@ struct BookmarkWindow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Code Prism")
                     .font(.headline)
-                Text("Bookmarks — open a project in a new window")
+                Text("Projects — one home window; each project opens once")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -88,7 +99,24 @@ struct BookmarkWindow: View {
 
     private func openProject(_ url: URL) {
         _ = bookmarks.remember(url: url)
-        openWindow(id: "project", value: url)
+        let id = ProjectWindowID(url: url)
+        if WindowRouter.focusProject(id: id) {
+            return
+        }
+        openWindow(id: WindowRouter.projectWindowId, value: id)
+    }
+
+    private static func collapseExtraBookmarksWindows() {
+        let bookmarks = NSApp.windows.filter {
+            $0.identifier?.rawValue == WindowRouter.bookmarksWindowId || $0.title == "Projects"
+        }
+        guard bookmarks.count > 1 else { return }
+        // Keep the key window (or first), close the rest.
+        let keep = bookmarks.first(where: \.isKeyWindow) ?? bookmarks[0]
+        for w in bookmarks where w !== keep {
+            w.close()
+        }
+        keep.makeKeyAndOrderFront(nil)
     }
 }
 
@@ -130,5 +158,3 @@ private struct BookmarkRow: View {
         .buttonStyle(.plain)
     }
 }
-
-import AppKit
