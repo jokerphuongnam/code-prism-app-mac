@@ -66,9 +66,7 @@ enum WindowRouter {
     }
 
     private static func isBookmarksWindow(_ window: NSWindow) -> Bool {
-        window.identifier?.rawValue == bookmarksWindowId
-            || window.title == "Projects"
-            || window.title.contains("Code Prism")
+        window.identifier?.rawValue == bookmarksWindowId || window.title == "Projects"
     }
 }
 

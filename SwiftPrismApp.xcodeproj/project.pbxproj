@@ -23,6 +23,7 @@
 		4C08E69AC93FA6CBE123BD47 /* GraphFingerprint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CB967A8DD0656CA8D1E6D66 /* GraphFingerprint.swift */; };
 		4D6CA136441B885DB8641332 /* BookmarkWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A881A3A917ED69CEC7562384 /* BookmarkWindow.swift */; };
 		5172F38EBAE250A6DF331BB6 /* NodeGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC506CAC35E25F7753C7B4EF /* NodeGeometry.swift */; };
+		5ACFC19FB8ECD8F1B27734FA /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FEE1680C8E65550F5667B1F /* AppDelegate.swift */; };
 		5B3BDAEEB0A3E5D1BDB078D6 /* IslandLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 957675AD2426FA38A844DA9B /* IslandLayout.swift */; };
 		7877EDE264601AF6B6AF33DD /* ProjectWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1E51A6B3206273CF6AD5C6 /* ProjectWatcher.swift */; };
 		7C7B53569635D2010C3D73C6 /* WindowRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61F2F7404805343F849DAAD1 /* WindowRouter.swift */; };
@@ -42,6 +43,7 @@
 		2689665BE7F6AAA3C68D986F /* WelcomeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeScreen.swift; sourceTree = "<group>"; };
 		3A25EA757E5BC1D7F8254277 /* BackendPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendPlugin.swift; sourceTree = "<group>"; };
 		3AB1E4B73BB403BD5057C1B6 /* InspectorPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorPanel.swift; sourceTree = "<group>"; };
+		3FEE1680C8E65550F5667B1F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		5300AFAD18F35ADFA6354A2C /* SwiftPrismApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SwiftPrismApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		558194B2E1A87C41D81D27DE /* ProjectRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRootView.swift; sourceTree = "<group>"; };
 		586DED365D5B90A6FC7C5E12 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -110,6 +112,7 @@
 		73E9D979960C6ECD5556CE18 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				3FEE1680C8E65550F5667B1F /* AppDelegate.swift */,
 				3A25EA757E5BC1D7F8254277 /* BackendPlugin.swift */,
 				B678DE3AE90FBD9E3112035D /* BookmarkStore.swift */,
 				98ACBFF84C553A88F52549DD /* DemoPaths.swift */,
@@ -218,6 +221,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5ACFC19FB8ECD8F1B27734FA /* AppDelegate.swift in Sources */,
 				B6D3F54767878C1768867C85 /* BackendPlugin.swift in Sources */,
 				4695D2F08DEB6DBB2C5ED67D /* BookmarkStore.swift in Sources */,
 				4D6CA136441B885DB8641332 /* BookmarkWindow.swift in Sources */,

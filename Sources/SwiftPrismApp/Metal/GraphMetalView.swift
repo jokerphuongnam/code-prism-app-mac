@@ -374,9 +374,10 @@ private struct GPUUniforms {
 final class GraphMetalRenderer: NSObject, MTKViewDelegate {
     private let device: MTLDevice
     private let queue: MTLCommandQueue
-    private var nodePipeline: MTLRenderPipelineState!
-    private var linePipeline: MTLRenderPipelineState!
-    private var depthState: MTLDepthStencilState!
+    private var nodePipeline: MTLRenderPipelineState?
+    private var linePipeline: MTLRenderPipelineState?
+    private var depthState: MTLDepthStencilState?
+    private var pipelineError: String?
 
     private var nodeBuffer: MTLBuffer?
     private var lineBuffer: MTLBuffer?
@@ -443,7 +444,8 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
         do {
             library = try device.makeLibrary(source: GraphShaderSource.metal, options: nil)
         } catch {
-            fatalError("Metal shader compile failed: \(error)")
+            pipelineError = "Metal shader compile failed: \(error)"
+            return
         }
         let desc = MTLRenderPipelineDescriptor()
         desc.colorAttachments[0].pixelFormat = view.colorPixelFormat
@@ -456,13 +458,18 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
         desc.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
         desc.depthAttachmentPixelFormat = .depth32Float
 
-        desc.vertexFunction = library.makeFunction(name: "node_vertex")
-        desc.fragmentFunction = library.makeFunction(name: "node_fragment")
-        nodePipeline = try! device.makeRenderPipelineState(descriptor: desc)
+        do {
+            desc.vertexFunction = library.makeFunction(name: "node_vertex")
+            desc.fragmentFunction = library.makeFunction(name: "node_fragment")
+            nodePipeline = try device.makeRenderPipelineState(descriptor: desc)
 
-        desc.vertexFunction = library.makeFunction(name: "line_vertex")
-        desc.fragmentFunction = library.makeFunction(name: "line_fragment")
-        linePipeline = try! device.makeRenderPipelineState(descriptor: desc)
+            desc.vertexFunction = library.makeFunction(name: "line_vertex")
+            desc.fragmentFunction = library.makeFunction(name: "line_fragment")
+            linePipeline = try device.makeRenderPipelineState(descriptor: desc)
+        } catch {
+            pipelineError = "Metal pipeline failed: \(error)"
+            return
+        }
 
         let depth = MTLDepthStencilDescriptor()
         depth.depthCompareFunction = .less
@@ -827,6 +834,10 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
         )
         memcpy(ub.contents(), &uniforms, MemoryLayout<GPUUniforms>.stride)
 
+        guard let nodePipeline, let linePipeline, let depthState else {
+            pauseIfIdle()
+            return
+        }
         let cmd = queue.makeCommandBuffer()!
         let enc = cmd.makeRenderCommandEncoder(descriptor: rpd)!
         enc.setDepthStencilState(depthState)

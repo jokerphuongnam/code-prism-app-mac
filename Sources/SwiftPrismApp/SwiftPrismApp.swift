@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct SwiftPrismApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var bookmarks = BookmarkStore()
 
     init() {

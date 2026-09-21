@@ -58,9 +58,12 @@ enum BackendRunner {
     static func cancelActiveAnalyze() {
         processLock.lock()
         cancelRequested = true
-        currentProcess?.terminate()
+        let proc = currentProcess
         currentProcess = nil
         processLock.unlock()
+        guard let proc else { return }
+        // Never block the UI thread waiting on a child to die.
+        DispatchQueue.global(qos: .utility).async { stopChild(proc) }
     }
 
     static func resetCancelFlag() {
@@ -151,10 +154,15 @@ enum BackendRunner {
         return jsonOut
     }
 
+    private static let maxFilesPerLanguage = 2_500
+
     private static func runSwiftAnalyzer(bin: URL, projectRoot: URL, jsonOut: URL) throws {
         // Filter noise (.agents / Generated / qa fixtures under huge monorepos).
         let files = sourceFiles(in: projectRoot, extensions: ["swift"])
         guard !files.isEmpty else { throw BackendError.noSourceFiles }
+        if files.count > maxFilesPerLanguage {
+            throw BackendError.tooManyFiles(files.count)
+        }
         // Passing 1000+ paths hangs / hits ARG_MAX. Prefer filtered list; if still huge, workspace-only.
         let proc = Process()
         proc.executableURL = bin
@@ -168,16 +176,39 @@ enum BackendRunner {
         if files.count <= 250 {
             args.append(contentsOf: files.map(\.path))
         }
-        // else: workspace scan without argv dump (still may be slow — timeout protects UI)
         proc.arguments = args
         try run(proc, timeout: files.count > 250 ? 90 : 180)
     }
 
     private static func runGenericBackend(bin: URL, projectRoot: URL, jsonOut: URL, lang: String) throws {
+        let exts = BackendCatalog.plugin(id: lang)?.extensions ?? []
+        if !exts.isEmpty {
+            let n = sourceFiles(in: projectRoot, extensions: exts).count
+            if n > maxFilesPerLanguage {
+                throw BackendError.tooManyFiles(n)
+            }
+        }
         let proc = Process()
         proc.executableURL = bin
         proc.arguments = ["--root", projectRoot.path, "--out", jsonOut.path, "--lang", lang]
         try run(proc, timeout: 180)
+    }
+
+    /// Stop a child analyzer without bringing down the app (debugger-friendly).
+    private static func stopChild(_ proc: Process) {
+        guard proc.isRunning else { return }
+        proc.interrupt()
+        let group = DispatchGroup()
+        group.enter()
+        DispatchQueue.global(qos: .utility).async {
+            proc.waitUntilExit()
+            group.leave()
+        }
+        if group.wait(timeout: .now() + 1.5) == .timedOut {
+            proc.terminate()
+            // Brief wait so terminate settles before we touch pipes.
+            proc.waitUntilExit()
+        }
     }
 
     private static func run(_ proc: Process, timeout: TimeInterval) throws {
@@ -190,8 +221,9 @@ enum BackendRunner {
         processLock.unlock()
 
         let errPipe = Pipe()
-        proc.standardOutput = Pipe()
+        proc.standardOutput = FileHandle.nullDevice
         proc.standardError = errPipe
+        proc.standardInput = FileHandle.nullDevice
         try proc.run()
 
         let group = DispatchGroup()
@@ -208,16 +240,19 @@ enum BackendRunner {
         processLock.unlock()
 
         if waitResult == .timedOut {
-            proc.terminate()
-            throw BackendError.analyzeFailed("timeout after \(Int(timeout))s — open a smaller root or Cancel and retry")
+            stopChild(proc)
+            throw BackendError.analyzeFailed(
+                "timeout after \(Int(timeout))s — open a smaller subproject (e.g. projects/desk-garden) or Cancel"
+            )
         }
-        // 15 = SIGTERM after Cancel
-        if cancelled || proc.terminationStatus == 15 || proc.terminationStatus == 9 {
+        // 15 = SIGTERM / 2 = SIGINT after Cancel — treat as cancel, never crash the app.
+        let status = proc.terminationStatus
+        if cancelled || status == 15 || status == 9 || status == 2 {
             throw BackendError.cancelled
         }
         let err = String(data: errPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-        if proc.terminationStatus != 0 {
-            throw BackendError.analyzeFailed(err.isEmpty ? "exit \(proc.terminationStatus)" : err)
+        if status != 0 {
+            throw BackendError.analyzeFailed(err.isEmpty ? "exit \(status)" : err)
         }
     }
 
