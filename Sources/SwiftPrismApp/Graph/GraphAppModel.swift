@@ -26,6 +26,9 @@ final class GraphAppModel: ObservableObject {
     private weak var bookmarks: BookmarkStore?
     private let zoomMin: CGFloat = 0.35
     private let zoomMax: CGFloat = 4.0
+    /// Bumps to drop stale background load results after rapid Open / Skip.
+    private var loadGeneration: UInt64 = 0
+    private let loadQueue = DispatchQueue(label: "app.codeprism.sot-load", qos: .userInitiated)
 
     func zoomIn() { setGraphZoom(graphZoom * 1.12) }
     func zoomOut() { setGraphZoom(graphZoom / 1.12) }
@@ -109,37 +112,55 @@ final class GraphAppModel: ObservableObject {
     /// Load / switch this window to a project folder (also bookmarks it).
     func adoptProject(_ url: URL) {
         watcher.stop()
+        loadGeneration &+= 1
+        let gen = loadGeneration
         projectRoot = url
         document = .empty
         selectedId = nil
         lastFingerprint = nil
+        detectedLanguages = []
         graphZoom = 1
-        do {
-            let detected = try LanguageDetect.detectAll(projectRoot: url)
-            detectedLanguages = detected
-            let detail = detected.map { "\($0.languageId)(\($0.evidence))" }.joined(separator: "; ")
-            status = "\(url.lastPathComponent) → \(languagesLabel) · \(detail)"
-            screen = .build
-            bookmarks?.remember(url: url, languages: detectedLanguageIds)
-            if let doc = try? GraphLoader.loadMerged(projectRoot: url, languages: detectedLanguageIds) {
-                lastFingerprint = GraphFingerprint.from(doc)
+        screen = .build
+        isBusy = true
+        buildProgressLabel = "Detecting languages…"
+        status = "Opening \(url.lastPathComponent)…"
+        bookmarks?.remember(url: url, languages: [])
+
+        loadQueue.async { [weak self] in
+            do {
+                // Detect only on Open — full SoT decode happens later on Skip/Build (background).
+                let detected = try LanguageDetect.detectAll(projectRoot: url)
+                let langs = detected.map(\.languageId)
+                let hasCache = langs.contains { SoTCache.resolveJSON(projectRoot: url, preferred: $0) != nil }
+                DispatchQueue.main.async {
+                    guard let self, gen == self.loadGeneration else { return }
+                    self.detectedLanguages = detected
+                    let detail = detected.map { "\($0.languageId)(\($0.evidence))" }.joined(separator: "; ")
+                    self.status =
+                        "\(url.lastPathComponent) → \(self.languagesLabel) · \(detail)"
+                        + (hasCache ? " · cache ready" : " · no cache yet")
+                    self.isBusy = false
+                    self.bookmarks?.remember(url: url, languages: langs)
+                    self.watcher.start(projectRoot: url)
+                    self.watcher.isEnabled = false
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    guard let self, gen == self.loadGeneration else { return }
+                    self.detectedLanguages = []
+                    self.document = .empty
+                    self.status = error.localizedDescription
+                    self.isBusy = false
+                    self.bookmarks?.remember(url: url, languages: [])
+                }
             }
-            // Watch only after Open settles; start disabled until graph is shown / build ends.
-            watcher.start(projectRoot: url)
-            watcher.isEnabled = false
-        } catch {
-            detectedLanguages = []
-            document = .empty
-            status = error.localizedDescription
-            screen = .build
-            bookmarks?.remember(url: url, languages: [])
         }
     }
 
     func showGraph() {
-        tryLoadSoT()
         screen = .graph
-        watcher.isEnabled = true
+        watcher.isEnabled = false
+        loadSoTInBackground(reason: "open graph")
     }
 
     func backToBuild() {
@@ -273,21 +294,55 @@ final class GraphAppModel: ObservableObject {
     }
 
     func tryLoadSoT() {
+        loadSoTInBackground(reason: "reload")
+    }
+
+    /// Decode SoT JSON off the main thread; publish `document` only when done.
+    private func loadSoTInBackground(reason: String) {
         guard let root = projectRoot else { return }
         let langs = detectedLanguageIds
         guard !langs.isEmpty else {
             document = .empty
+            status = "Chưa nhận diện được ngôn ngữ."
             return
         }
-        do {
-            let doc = try GraphLoader.loadMerged(projectRoot: root, languages: langs)
-            document = doc
-            lastFingerprint = GraphFingerprint.from(doc)
-            if selectedId == nil { selectedId = doc.nodes.first?.id }
-            status = "Loaded SoT (\(langs.joined(separator: "+"))): \(doc.nodes.count) nodes, \(doc.links.count) links"
-        } catch {
-            document = .empty
-            status = "\(root.lastPathComponent) → \(languagesLabel). Chưa có cache — bấm Build into cache."
+
+        loadGeneration &+= 1
+        let gen = loadGeneration
+        isBusy = true
+        buildProgressLabel = "Loading SoT…"
+        status = "Loading SoT (\(langs.joined(separator: "+"))) in background…"
+
+        loadQueue.async { [weak self] in
+            do {
+                let doc = try GraphLoader.loadMerged(projectRoot: root, languages: langs)
+                let fp = GraphFingerprint.from(doc)
+                DispatchQueue.main.async {
+                    guard let self, gen == self.loadGeneration else { return }
+                    self.document = doc
+                    self.lastFingerprint = fp
+                    if self.selectedId == nil || self.document.nodes.contains(where: { $0.id == self.selectedId }) == false {
+                        self.selectedId = doc.nodes.first?.id
+                    }
+                    self.isBusy = false
+                    self.status =
+                        "Loaded SoT (\(langs.joined(separator: "+"))): \(doc.nodes.count) nodes, \(doc.links.count) links · \(reason)"
+                    if self.screen == .graph {
+                        self.watcher.isEnabled = true
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    guard let self, gen == self.loadGeneration else { return }
+                    self.document = .empty
+                    self.isBusy = false
+                    self.status =
+                        "\(root.lastPathComponent) → \(self.languagesLabel). Chưa có cache — bấm Build into cache."
+                    if self.screen == .graph {
+                        self.watcher.isEnabled = true
+                    }
+                }
+            }
         }
     }
 }

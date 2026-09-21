@@ -372,59 +372,182 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
         layoutWorkItem?.cancel()
         layoutSettling = true
         requestFrames()
-        nodeIds = document.nodes.map(\.id)
-        flavors = document.nodes.map(\.flavor)
-        let idToIndex = Dictionary(uniqueKeysWithValues: nodeIds.enumerated().map { ($0.element, $0.offset) })
-        linkPairs = document.links.compactMap { link in
-            guard let a = idToIndex[link.source], let b = idToIndex[link.target] else { return nil }
-            return (a, b, link.kind)
-        }
 
-        let n = max(nodeIds.count, 1)
-        baseDistance = max(12, min(90, Float(n) * 0.18 + 10))
-        updateCameraDistance()
-
-        let force = ForceLayout3D(nodeIds: nodeIds, links: document.links.map { ($0.source, $0.target) })
-        force.linkDistance = n > 400 ? 3.2 : 4.0
-        force.charge = n > 300 ? 0 : -36
-        layout = force
-
-        // Short background settle — few GPU uploads (avoids "breathing / zoom" thrash).
-        let warm = n > 800 ? 10 : (n > 300 ? 22 : 50)
-        let settle = n > 400 ? 24 : 40
+        // Heavy index / force setup + buffer packing stay off the main thread.
+        let nodesSnapshot = document.nodes
+        let linksSnapshot = document.links
+        let selected = selectedId
         var work: DispatchWorkItem!
         work = DispatchWorkItem { [weak self] in
-            guard let self, let layout = self.layout else { return }
+            guard let self else { return }
+            let ids = nodesSnapshot.map(\.id)
+            let flavorsLocal = nodesSnapshot.map(\.flavor)
+            let idToIndex = Dictionary(uniqueKeysWithValues: ids.enumerated().map { ($0.element, $0.offset) })
+            let pairs: [(Int, Int, String)] = linksSnapshot.compactMap { link in
+                guard let a = idToIndex[link.source], let b = idToIndex[link.target] else { return nil }
+                return (a, b, link.kind)
+            }
+            let n = max(ids.count, 1)
+            let force = ForceLayout3D(nodeIds: ids, links: linksSnapshot.map { ($0.source, $0.target) })
+            force.linkDistance = n > 400 ? 3.2 : 4.0
+            force.charge = n > 300 ? 0 : -36
+
+            let seedPos = ids.map { force.positions[$0] ?? .zero }
+            let seedPack = self.packGPU(
+                ids: ids,
+                flavors: flavorsLocal,
+                positions: seedPos,
+                linkPairs: pairs,
+                selectedId: selected
+            )
+            DispatchQueue.main.async {
+                guard !work.isCancelled else { return }
+                self.nodeIds = ids
+                self.flavors = flavorsLocal
+                self.linkPairs = pairs
+                self.layout = force
+                self.positions = seedPos
+                self.baseDistance = max(12, min(90, Float(n) * 0.18 + 10))
+                self.updateCameraDistance()
+                self.applyPackedGPU(seedPack)
+            }
+
+            let warm = n > 800 ? 10 : (n > 300 ? 22 : 50)
+            let settle = n > 400 ? 24 : 40
             for _ in 0..<warm {
                 if work.isCancelled { return }
-                _ = layout.tick(1)
+                _ = force.tick(1)
             }
-            let midPos = self.nodeIds.map { layout.positions[$0] ?? .zero }
+            let midPos = ids.map { force.positions[$0] ?? .zero }
+            let midPack = self.packGPU(
+                ids: ids,
+                flavors: flavorsLocal,
+                positions: midPos,
+                linkPairs: pairs,
+                selectedId: self.selectedId
+            )
             DispatchQueue.main.async {
+                guard !work.isCancelled else { return }
                 self.positions = midPos
-                self.uploadGPUBuffers()
+                self.applyPackedGPU(midPack)
             }
             for _ in 0..<settle {
                 if work.isCancelled { return }
-                _ = layout.tick(n > 400 ? 1 : 2)
+                _ = force.tick(n > 400 ? 1 : 2)
             }
-            let finalPos = self.nodeIds.map { layout.positions[$0] ?? .zero }
+            let finalPos = ids.map { force.positions[$0] ?? .zero }
+            let finalPack = self.packGPU(
+                ids: ids,
+                flavors: flavorsLocal,
+                positions: finalPos,
+                linkPairs: pairs,
+                selectedId: self.selectedId
+            )
             DispatchQueue.main.async {
+                guard !work.isCancelled else { return }
                 self.positions = finalPos
-                self.uploadGPUBuffers()
+                self.applyPackedGPU(finalPack)
                 self.layoutSettling = false
                 self.pauseIfIdle()
             }
         }
         layoutWorkItem = work
-        // Seed immediate sphere so first frame isn't empty.
-        positions = nodeIds.map { force.positions[$0] ?? .zero }
-        uploadGPUBuffers()
         DispatchQueue.global(qos: .userInitiated).async(execute: work)
     }
 
     func refreshSelectionColors() {
-        uploadGPUBuffers()
+        let ids = nodeIds
+        let flavorsLocal = flavors
+        let pos = positions
+        let pairs = linkPairs
+        let selected = selectedId
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
+            let pack = self.packGPU(
+                ids: ids,
+                flavors: flavorsLocal,
+                positions: pos,
+                linkPairs: pairs,
+                selectedId: selected
+            )
+            DispatchQueue.main.async {
+                self.applyPackedGPU(pack)
+                self.requestFrames()
+                self.pauseIfIdle()
+            }
+        }
+    }
+
+    private struct PackedGPU {
+        var nodeBuffer: MTLBuffer?
+        var lineBuffer: MTLBuffer?
+        var nodeCount: Int
+        var lineVertexCount: Int
+    }
+
+    private func packGPU(
+        ids: [String],
+        flavors: [String],
+        positions: [SIMD3<Float>],
+        linkPairs: [(Int, Int, String)],
+        selectedId: String?
+    ) -> PackedGPU {
+        guard !ids.isEmpty else {
+            return PackedGPU(nodeBuffer: nil, lineBuffer: nil, nodeCount: 0, lineVertexCount: 0)
+        }
+        var nodes: [GPUNode] = []
+        nodes.reserveCapacity(ids.count)
+        for (i, id) in ids.enumerated() {
+            let p = i < positions.count ? positions[i] : .zero
+            let flavor = i < flavors.count ? flavors[i] : "type"
+            let selected = id == selectedId
+            var c = color(for: flavor)
+            if selected { c = SIMD4(1, 0.9, 0.2, 1) }
+            let size = selected ? size(for: flavor) * 1.45 : size(for: flavor)
+            nodes.append(GPUNode(position: p, size: size, color: c))
+        }
+        let nodeBuf = device.makeBuffer(
+            bytes: nodes,
+            length: MemoryLayout<GPUNode>.stride * nodes.count,
+            options: [.storageModeShared]
+        )
+
+        var lines: [GPULine] = []
+        lines.reserveCapacity(min(linkPairs.count, 20_000) * 2)
+        let maxLinks = 20_000
+        for (idx, pair) in linkPairs.enumerated() {
+            if idx >= maxLinks { break }
+            let (a, b, kind) = pair
+            guard a < positions.count, b < positions.count else { continue }
+            let col: SIMD4<Float> =
+                kind == "call"
+                ? SIMD4(0.25, 0.55, 1.0, 0.55)
+                : SIMD4(0.55, 0.55, 0.58, 0.35)
+            lines.append(GPULine(position: positions[a], color: col))
+            lines.append(GPULine(position: positions[b], color: col))
+        }
+        let lineBuf: MTLBuffer? =
+            lines.isEmpty
+            ? nil
+            : device.makeBuffer(
+                bytes: lines,
+                length: MemoryLayout<GPULine>.stride * lines.count,
+                options: [.storageModeShared]
+            )
+        return PackedGPU(
+            nodeBuffer: nodeBuf,
+            lineBuffer: lineBuf,
+            nodeCount: nodes.count,
+            lineVertexCount: lines.count
+        )
+    }
+
+    private func applyPackedGPU(_ pack: PackedGPU) {
+        nodeBuffer = pack.nodeBuffer
+        lineBuffer = pack.lineBuffer
+        nodeCount = pack.nodeCount
+        lineVertexCount = pack.lineVertexCount
+        requestFrames()
     }
 
     private func updateCameraDistance() {
@@ -447,56 +570,6 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
         pitchVel = min(max(pitchVel, -0.25), 0.25)
         // Keep a few frames for inertia, then pauseIfIdle in draw().
         requestFrames()
-    }
-
-    private func uploadGPUBuffers() {
-        guard !nodeIds.isEmpty else {
-            nodeCount = 0
-            lineVertexCount = 0
-            return
-        }
-        var nodes: [GPUNode] = []
-        nodes.reserveCapacity(nodeIds.count)
-        for (i, id) in nodeIds.enumerated() {
-            let p = i < positions.count ? positions[i] : .zero
-            let flavor = i < flavors.count ? flavors[i] : "type"
-            let selected = id == selectedId
-            var c = color(for: flavor)
-            if selected { c = SIMD4(1, 0.9, 0.2, 1) }
-            let size = selected ? size(for: flavor) * 1.45 : size(for: flavor)
-            nodes.append(GPUNode(position: p, size: size, color: c))
-        }
-        nodeCount = nodes.count
-        nodeBuffer = device.makeBuffer(
-            bytes: nodes,
-            length: MemoryLayout<GPUNode>.stride * nodes.count,
-            options: [.storageModeShared]
-        )
-
-        var lines: [GPULine] = []
-        lines.reserveCapacity(min(linkPairs.count, 20_000) * 2)
-        let maxLinks = 20_000
-        for (idx, pair) in linkPairs.enumerated() {
-            if idx >= maxLinks { break }
-            let (a, b, kind) = pair
-            guard a < positions.count, b < positions.count else { continue }
-            let col: SIMD4<Float> =
-                kind == "call"
-                ? SIMD4(0.25, 0.55, 1.0, 0.55)
-                : SIMD4(0.55, 0.55, 0.58, 0.35)
-            lines.append(GPULine(position: positions[a], color: col))
-            lines.append(GPULine(position: positions[b], color: col))
-        }
-        lineVertexCount = lines.count
-        if !lines.isEmpty {
-            lineBuffer = device.makeBuffer(
-                bytes: lines,
-                length: MemoryLayout<GPULine>.stride * lines.count,
-                options: [.storageModeShared]
-            )
-        } else {
-            lineBuffer = nil
-        }
     }
 
     private func color(for flavor: String) -> SIMD4<Float> {
