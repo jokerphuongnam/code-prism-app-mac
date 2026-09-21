@@ -62,10 +62,13 @@ struct GraphMetalView: NSViewRepresentable {
             host.onZoomDelta = { [weak self] factor in
                 guard let self else { return }
                 if factor < 1 {
-                    // Zooming out → pull camera pivot back to world origin so all islands reappear.
+                    // Zooming out → return pivot to content center so every island reappears.
                     self.host?.pullFocusHome(strength: Float(1 - factor))
+                } else {
+                    // Zooming in toward empty space → snap pivot to a real island/node.
+                    self.host?.ensureInspectPivot()
                 }
-                let next = min(max(self.externalZoom * factor, 0.02), 120.0)
+                let next = min(max(self.externalZoom * factor, 0.35), 40.0)
                 self.externalZoom = next
                 self.onZoomChange(next)
             }
@@ -88,7 +91,7 @@ struct GraphMetalView: NSViewRepresentable {
             host?.setSelectedId(selectedId)
             // Auto-frame newly selected node so zoom/orbit inspects it, not the cloud center.
             if selectionChanged, let selectedId {
-                host?.focusOnNode(id: selectedId, suggestedZoom: 16, bumpZoom: zoom < 8)
+                host?.focusOnNode(id: selectedId, suggestedZoom: 0, bumpZoom: zoom < 2.5)
             }
             if forceRebuild || sig != signature {
                 signature = sig
@@ -124,17 +127,23 @@ final class GraphMetalHostView: NSView {
     }
 
     func focusOnNode(id: String, suggestedZoom: CGFloat, bumpZoom: Bool = true) {
-        renderer?.focus(on: id)
+        let inspectZoom = renderer?.focus(on: id) ?? 8
         wakeRender()
         guard bumpZoom else { return }
-        let current = max(CGFloat(renderer?.zoom ?? 1), 0.02)
-        if current < suggestedZoom * 0.9 {
-            onZoomDelta?(suggestedZoom / current)
+        let target = suggestedZoom > 1 ? suggestedZoom : CGFloat(inspectZoom)
+        let current = max(CGFloat(renderer?.zoom ?? 1), 0.35)
+        if current < target * 0.85 {
+            onZoomDelta?(target / current)
         }
     }
 
     func pullFocusHome(strength: Float) {
         renderer?.pullFocusHome(strength: strength)
+        wakeRender()
+    }
+
+    func ensureInspectPivot() {
+        renderer?.ensureInspectPivot()
         wakeRender()
     }
 
@@ -302,7 +311,7 @@ final class GraphMetalHostView: NSView {
         let p = gesture.location(in: self)
         if let id = renderer?.pickNode(at: p, in: bounds) {
             onSelect?(id)
-            focusOnNode(id: id, suggestedZoom: 22, bumpZoom: true)
+            focusOnNode(id: id, suggestedZoom: 0, bumpZoom: true)
         } else {
             // Double-click empty space → reset focus to graph center (keep zoom).
             fitAll()
@@ -398,9 +407,13 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
     private var pitchVel: Float = 0
     private var dragging = false
     private var radius: Float = 16
-    private var baseDistance: Float = 16
-    /// Orbit pivot — origin by default; jumps to a node when focusing.
+    /// Distance at zoom == 1 that frames the whole graph.
+    private var fitRadius: Float = 80
+    private let minInspectRadius: Float = 2.8
+    private let maxOverviewMul: Float = 2.2
+    /// Orbit pivot — content centroid by default; jumps to a node when focusing.
     private var focusCenter: SIMD3<Float> = .zero
+    private var contentCentroid: SIMD3<Float> = .zero
     private var lastTick = CACurrentMediaTime()
 
     init(device: MTLDevice, view: MTKView) {
@@ -498,7 +511,6 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
                 linkPairs: pairs,
                 selectedId: selected
             )
-            let extent = finalPos.map { length($0) }.max() ?? 20
             DispatchQueue.main.async {
                 guard !work.isCancelled else { return }
                 self.nodeIds = ids
@@ -508,12 +520,6 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
                 self.positions = finalPos
                 self.islandCenters = islanded.islandCenters
                 self.islandOf = islanded.islandOf
-                // zoom == 1 should frame every island; allow zoom-out further via zoomMin.
-                let fov: Float = 50 * .pi / 180
-                let fitR = max(24, extent / max(tan(fov * 0.5), 0.01) * 1.2)
-                self.baseDistance = fitR
-                self.focusCenter = .zero
-                self.updateCameraDistance()
                 self.applyPackedGPU(pack)
                 self.layoutSettling = false
                 // After islands land, snap to overview so the whole company is visible.
@@ -621,44 +627,78 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
     }
 
     private func updateCameraDistance() {
-        // Allow getting very close for single-node inspection (marlin-scale graphs).
-        radius = max(0.25, baseDistance / max(zoom, 0.015))
+        // zoom 1 → fitRadius (full overview); zoom up → closer inspect; zoom down → wider.
+        let z = max(zoom, 0.05)
+        radius = min(fitRadius * maxOverviewMul, max(minInspectRadius, fitRadius / z))
     }
 
-    func focus(on id: String) {
-        guard let idx = nodeIds.firstIndex(of: id), idx < positions.count else { return }
+    private func recomputeFitRadius() {
+        guard !positions.isEmpty else {
+            fitRadius = 48
+            contentCentroid = .zero
+            return
+        }
+        var mn = positions[0]
+        var mx = positions[0]
+        for p in positions {
+            mn = simd_min(mn, p)
+            mx = simd_max(mx, p)
+        }
+        contentCentroid = (mn + mx) * 0.5
+        let half = (mx - mn) * 0.5
+        let sphereR = max(length(half), 10)
+        let fovY: Float = 55 * .pi / 180
+        // Extra margin so outermost islands aren't clipped at zoom == 1.
+        fitRadius = sphereR / max(tan(fovY * 0.5), 0.01) * 1.55
+    }
+
+    /// Returns recommended inspect zoom (fitRadius / ~5.5).
+    @discardableResult
+    func focus(on id: String) -> Float {
+        guard let idx = nodeIds.firstIndex(of: id), idx < positions.count else { return zoom }
         focusCenter = positions[idx]
         selectedId = id
+        if fitRadius < 8 { recomputeFitRadius() }
+        let targetR: Float = 5.5
+        let inspectZoom = min(40, max(2.5, fitRadius / targetR))
         requestFrames()
+        return inspectZoom
     }
 
     func clearFocus() {
-        focusCenter = .zero
+        focusCenter = contentCentroid
         requestFrames()
     }
 
-    /// While zooming out, ease the orbit pivot back to the world origin.
+    /// While zooming out, ease the orbit pivot back to the content center.
     func pullFocusHome(strength: Float) {
-        let t = min(max(strength * 1.8, 0), 0.55)
-        focusCenter = focusCenter * (1 - t)
-        if length_squared(focusCenter) < 1 {
-            focusCenter = .zero
+        let t = min(max(strength * 1.8, 0), 0.6)
+        focusCenter = focusCenter + (contentCentroid - focusCenter) * t
+        if length_squared(focusCenter - contentCentroid) < 4 {
+            focusCenter = contentCentroid
         }
         requestFrames()
     }
 
-    /// Frame every island: pivot at origin, set baseDistance so zoom 1 shows all nodes.
+    /// Zooming in with pivot still on empty centroid → jump to selected / largest island.
+    func ensureInspectPivot() {
+        if length_squared(focusCenter - contentCentroid) > 4 { return }
+        if let sel = selectedId, let idx = nodeIds.firstIndex(of: sel), idx < positions.count {
+            focusCenter = positions[idx]
+            requestFrames()
+            return
+        }
+        if let best = islandCenters.max(by: { $0.nodeCount < $1.nodeCount }) {
+            focusCenter = best.center
+            requestFrames()
+        }
+    }
+
+    /// Frame every island: pivot at content center, zoom 1 = full overview.
     @discardableResult
     func fitAll() -> Float {
-        focusCenter = .zero
-        guard !positions.isEmpty else {
-            updateCameraDistance()
-            requestFrames()
-            return 1
-        }
-        let extent = positions.map { length($0) }.max() ?? 20
-        let fov: Float = 50 * .pi / 180
-        baseDistance = max(24, extent / max(tan(fov * 0.5), 0.01) * 1.25)
+        recomputeFitRadius()
+        focusCenter = contentCentroid
         zoom = 1
         updateCameraDistance()
         requestFrames()
@@ -709,9 +749,9 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
     private func viewProjection(aspect: Float) -> simd_float4x4 {
         let eye = cameraEye()
         let view = lookAt(eye: eye, center: focusCenter, up: SIMD3(0, 1, 0))
-        let near: Float = radius < 2 ? 0.01 : 0.05
-        let far: Float = max(2_000, max(radius, baseDistance) * 40)
-        let proj = perspective(fovY: 50 * .pi / 180, aspect: aspect, near: near, far: far)
+        let near: Float = max(0.05, radius * 0.01)
+        let far: Float = max(3_000, max(radius, fitRadius) * 50)
+        let proj = perspective(fovY: 55 * .pi / 180, aspect: aspect, near: near, far: far)
         return proj * view
     }
 
@@ -778,10 +818,12 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
 
         let w = Float(view.drawableSize.width)
         let h = max(Float(view.drawableSize.height), 1)
+        // Keep dots visible in overview; shrink sprites when very close.
+        let pointScale = min(2.8, max(0.7, radius / max(fitRadius * 0.35, 1)))
         var uniforms = GPUUniforms(
             viewProjection: viewProjection(aspect: w / h),
             viewport: SIMD2(w, h),
-            pointScale: 1.0
+            pointScale: pointScale
         )
         memcpy(ub.contents(), &uniforms, MemoryLayout<GPUUniforms>.stride)
 

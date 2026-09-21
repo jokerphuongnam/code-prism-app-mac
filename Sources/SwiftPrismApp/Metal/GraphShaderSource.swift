@@ -42,9 +42,10 @@ enum GraphShaderSource {
         float4 clip = u.viewProjection * float4(n.position, 1.0);
         out.position = clip;
         out.color = n.color;
-        float w = max(abs(clip.w), 0.001);
-        // Stronger perspective sizing so zooming in separates individual nodes.
-        out.pointSize = clamp((n.size * u.pointScale) / w * u.viewport.y * 0.07, 2.0, 96.0);
+        // Soft perspective: stay readable when zoomed out, don't blow up into blobs when close.
+        float w = max(abs(clip.w), 0.35);
+        float px = (n.size * u.pointScale) * (18.0 / w);
+        out.pointSize = clamp(px, 3.0, 28.0);
         return out;
     }
 

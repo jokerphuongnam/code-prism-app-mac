@@ -24,15 +24,15 @@ final class GraphAppModel: ObservableObject {
 
     private let watcher = ProjectWatcher()
     private weak var bookmarks: BookmarkStore?
-    /// Wide range: tiny zoom = overview of all islands; large zoom = single node.
-    private let zoomMin: CGFloat = 0.02
-    private let zoomMax: CGFloat = 120.0
+    /// 1 = fit all islands; larger = closer inspect; smaller = wider overview.
+    private let zoomMin: CGFloat = 0.35
+    private let zoomMax: CGFloat = 40.0
     /// Bumps to drop stale background load results after rapid Open / Skip.
     private var loadGeneration: UInt64 = 0
     private let loadQueue = DispatchQueue(label: "app.codeprism.sot-load", qos: .userInitiated)
 
-    func zoomIn() { setGraphZoom(graphZoom * 1.2) }
-    func zoomOut() { setGraphZoom(graphZoom / 1.2) }
+    func zoomIn() { setGraphZoom(graphZoom * 1.18) }
+    func zoomOut() { setGraphZoom(graphZoom / 1.18) }
     func resetZoom() { setGraphZoom(1) }
     func setGraphZoom(_ value: CGFloat) {
         graphZoom = min(max(value, zoomMin), zoomMax)
