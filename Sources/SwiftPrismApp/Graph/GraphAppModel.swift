@@ -76,20 +76,19 @@ final class GraphAppModel: ObservableObject {
         }
     }
 
-    /// Sidebar groups — company subprojects as islands (mpm, libraries, …).
+    /// Sidebar groups — project × language islands (e.g. `mpm · marlin`, `tools · swift`).
     var nodesByIsland: [(island: String, nodes: [GraphNode])] {
         let root = document.projectRoot
+        let multiLang = Set(document.nodes.map(\.language).filter { !$0.isEmpty }).count > 1
+            || Set(document.nodes.map { IslandLayout.languageKey(for: $0) }.filter { !$0.isEmpty }).count > 1
         var buckets: [String: [GraphNode]] = [:]
         for n in filteredNodes {
-            let key =
-                n.filePath.isEmpty
-                ? "external"
-                : IslandLayout.islandKey(filePath: n.filePath, projectRoot: root)
+            let key = IslandLayout.islandKey(for: n, projectRoot: root, multiLang: multiLang)
             buckets[key, default: []].append(n)
         }
         return buckets.keys.sorted { a, b in
-            if a == "external" { return false }
-            if b == "external" { return true }
+            if a.hasPrefix("external") { return false }
+            if b.hasPrefix("external") { return true }
             return (buckets[a]?.count ?? 0) > (buckets[b]?.count ?? 0)
         }.map { ($0, buckets[$0] ?? []) }
     }

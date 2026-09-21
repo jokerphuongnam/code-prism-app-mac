@@ -31,6 +31,7 @@ enum GraphLoader {
                     var nn = n
                     nn.id = prefix + n.id
                     nn.dependencies = n.dependencies.map { prefix + $0 }
+                    nn.language = lang
                     if languages.count > 1 {
                         nn.name = "[\(lang)] \(n.name)"
                     }

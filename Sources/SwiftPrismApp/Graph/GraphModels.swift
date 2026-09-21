@@ -10,6 +10,8 @@ struct GraphNode: Identifiable, Hashable {
     var line: Int
     var signature: String
     var dependencies: [String]
+    /// Prism language id when known (`swift`, `marlin`, …). Empty if unspecified.
+    var language: String = ""
 }
 
 struct GraphLink: Identifiable, Hashable {
