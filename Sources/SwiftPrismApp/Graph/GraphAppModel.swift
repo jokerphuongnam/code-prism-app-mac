@@ -24,9 +24,9 @@ final class GraphAppModel: ObservableObject {
 
     private let watcher = ProjectWatcher()
     private weak var bookmarks: BookmarkStore?
-    /// Wide range so dense graphs (e.g. marlin-language) can inspect a single node.
-    private let zoomMin: CGFloat = 0.08
-    private let zoomMax: CGFloat = 80.0
+    /// Wide range: tiny zoom = overview of all islands; large zoom = single node.
+    private let zoomMin: CGFloat = 0.02
+    private let zoomMax: CGFloat = 120.0
     /// Bumps to drop stale background load results after rapid Open / Skip.
     private var loadGeneration: UInt64 = 0
     private let loadQueue = DispatchQueue(label: "app.codeprism.sot-load", qos: .userInitiated)

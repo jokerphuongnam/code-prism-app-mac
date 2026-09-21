@@ -58,6 +58,12 @@ struct ContentView: View {
 
             Button("Reset") { model.resetZoom() }
                 .disabled(abs(model.graphZoom - 1) < 0.01)
+
+            Button("Fit all") {
+                model.resetZoom()
+                NotificationCenter.default.post(name: .graphFitAll, object: nil)
+            }
+            .help("Zoom out to show every island/node. Double-click empty graph space also fits.")
         }
     }
 
