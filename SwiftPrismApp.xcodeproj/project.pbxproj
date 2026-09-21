@@ -23,6 +23,7 @@
 		4C08E69AC93FA6CBE123BD47 /* GraphFingerprint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CB967A8DD0656CA8D1E6D66 /* GraphFingerprint.swift */; };
 		4D6CA136441B885DB8641332 /* BookmarkWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A881A3A917ED69CEC7562384 /* BookmarkWindow.swift */; };
 		5172F38EBAE250A6DF331BB6 /* NodeGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC506CAC35E25F7753C7B4EF /* NodeGeometry.swift */; };
+		5B3BDAEEB0A3E5D1BDB078D6 /* IslandLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 957675AD2426FA38A844DA9B /* IslandLayout.swift */; };
 		7877EDE264601AF6B6AF33DD /* ProjectWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1E51A6B3206273CF6AD5C6 /* ProjectWatcher.swift */; };
 		A25E74E98239985B771FB89F /* GraphSceneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9811EDADCFE502AB6AB5FF33 /* GraphSceneView.swift */; };
 		B6D3F54767878C1768867C85 /* BackendPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A25EA757E5BC1D7F8254277 /* BackendPlugin.swift */; };
@@ -46,6 +47,7 @@
 		5B1E51A6B3206273CF6AD5C6 /* ProjectWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectWatcher.swift; sourceTree = "<group>"; };
 		7B5A9E399ED584A00B585644 /* GraphShaderSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphShaderSource.swift; sourceTree = "<group>"; };
 		7CB967A8DD0656CA8D1E6D66 /* GraphFingerprint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphFingerprint.swift; sourceTree = "<group>"; };
+		957675AD2426FA38A844DA9B /* IslandLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandLayout.swift; sourceTree = "<group>"; };
 		9811EDADCFE502AB6AB5FF33 /* GraphSceneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphSceneView.swift; sourceTree = "<group>"; };
 		98ACBFF84C553A88F52549DD /* DemoPaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoPaths.swift; sourceTree = "<group>"; };
 		A881A3A917ED69CEC7562384 /* BookmarkWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkWindow.swift; sourceTree = "<group>"; };
@@ -68,6 +70,7 @@
 				7CB967A8DD0656CA8D1E6D66 /* GraphFingerprint.swift */,
 				F53173912AFA322EA7E7E8ED /* GraphLoader.swift */,
 				B75145A6ACC033381925292A /* GraphModels.swift */,
+				957675AD2426FA38A844DA9B /* IslandLayout.swift */,
 			);
 			path = Graph;
 			sourceTree = "<group>";
@@ -227,6 +230,7 @@
 				A25E74E98239985B771FB89F /* GraphSceneView.swift in Sources */,
 				F36627B08BC01605DB37A7F3 /* GraphShaderSource.swift in Sources */,
 				3E79D3DD3F0B062B8F96C690 /* InspectorPanel.swift in Sources */,
+				5B3BDAEEB0A3E5D1BDB078D6 /* IslandLayout.swift in Sources */,
 				0ACC7A9FB398E05711331608 /* LanguageDetect.swift in Sources */,
 				5172F38EBAE250A6DF331BB6 /* NodeGeometry.swift in Sources */,
 				36DC679891FDE6ED4CB86508 /* PluginDiscovery.swift in Sources */,

@@ -108,17 +108,19 @@ struct ContentView: View {
             }
 
             List(selection: $model.selectedId) {
-                Section("Nodes (\(model.filteredNodes.count))") {
-                    ForEach(model.filteredNodes) { node in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(node.name)
-                                .font(.body.weight(.medium))
-                            Text("\(node.flavor) · \(node.id)")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                ForEach(model.nodesByIsland, id: \.island) { group in
+                    Section("\(group.island) (\(group.nodes.count))") {
+                        ForEach(group.nodes) { node in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(node.name)
+                                    .font(.body.weight(.medium))
+                                Text("\(node.flavor) · \(node.id)")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                            .tag(Optional(node.id))
                         }
-                        .tag(Optional(node.id))
                     }
                 }
             }

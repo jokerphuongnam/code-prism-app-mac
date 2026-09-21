@@ -345,6 +345,8 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
     private var layoutWorkItem: DispatchWorkItem?
     private weak var metalView: MTKView?
     private var layoutSettling = false
+    private var islandCenters: [(name: String, center: SIMD3<Float>, nodeCount: Int)] = []
+    private var islandOf: [String: String] = [:]
 
     var selectedId: String?
     var zoom: Float = 1 {
@@ -421,9 +423,10 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
         layoutSettling = true
         requestFrames()
 
-        // Heavy index / force setup + buffer packing stay off the main thread.
+        // Island layout + buffer packing stay off the main thread.
         let nodesSnapshot = document.nodes
         let linksSnapshot = document.links
+        let projectRoot = document.projectRoot
         let selected = selectedId
         var work: DispatchWorkItem!
         work = DispatchWorkItem { [weak self] in
@@ -436,66 +439,39 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
                 return (a, b, link.kind)
             }
             let n = max(ids.count, 1)
-            let force = ForceLayout3D(nodeIds: ids, links: linksSnapshot.map { ($0.source, $0.target) })
-            // Spread nodes so deep zoom can separate neighbors (marlin-language ~200–1k).
-            force.linkDistance = n > 400 ? 4.5 : 5.5
-            force.charge = n > 500 ? -8 : -42
+            let warm = n > 800 ? 8 : (n > 300 ? 16 : 36)
+            let settle = n > 400 ? 18 : 28
+            // Each top-level project/folder = one island (mpm, libraries, projects/…, …).
+            let islanded = IslandLayout.layout(
+                nodes: nodesSnapshot,
+                links: linksSnapshot,
+                projectRoot: projectRoot,
+                warmSteps: warm,
+                settleSteps: settle
+            )
+            if work.isCancelled { return }
 
-            let seedPos = ids.map { force.positions[$0] ?? .zero }
-            let seedPack = self.packGPU(
+            let finalPos = ids.map { islanded.positions[$0] ?? .zero }
+            let pack = self.packGPU(
                 ids: ids,
                 flavors: flavorsLocal,
-                positions: seedPos,
+                positions: finalPos,
                 linkPairs: pairs,
                 selectedId: selected
             )
+            let extent = finalPos.map { length($0) }.max() ?? 20
             DispatchQueue.main.async {
                 guard !work.isCancelled else { return }
                 self.nodeIds = ids
                 self.flavors = flavorsLocal
                 self.linkPairs = pairs
-                self.layout = force
-                self.positions = seedPos
-                self.baseDistance = max(12, min(90, Float(n) * 0.18 + 10))
-                self.updateCameraDistance()
-                self.applyPackedGPU(seedPack)
-            }
-
-            let warm = n > 800 ? 10 : (n > 300 ? 22 : 50)
-            let settle = n > 400 ? 24 : 40
-            for _ in 0..<warm {
-                if work.isCancelled { return }
-                _ = force.tick(1)
-            }
-            let midPos = ids.map { force.positions[$0] ?? .zero }
-            let midPack = self.packGPU(
-                ids: ids,
-                flavors: flavorsLocal,
-                positions: midPos,
-                linkPairs: pairs,
-                selectedId: self.selectedId
-            )
-            DispatchQueue.main.async {
-                guard !work.isCancelled else { return }
-                self.positions = midPos
-                self.applyPackedGPU(midPack)
-            }
-            for _ in 0..<settle {
-                if work.isCancelled { return }
-                _ = force.tick(n > 400 ? 1 : 2)
-            }
-            let finalPos = ids.map { force.positions[$0] ?? .zero }
-            let finalPack = self.packGPU(
-                ids: ids,
-                flavors: flavorsLocal,
-                positions: finalPos,
-                linkPairs: pairs,
-                selectedId: self.selectedId
-            )
-            DispatchQueue.main.async {
-                guard !work.isCancelled else { return }
+                self.layout = nil
                 self.positions = finalPos
-                self.applyPackedGPU(finalPack)
+                self.islandCenters = islanded.islandCenters
+                self.islandOf = islanded.islandOf
+                self.baseDistance = max(18, min(160, extent * 1.35 + 12))
+                self.updateCameraDistance()
+                self.applyPackedGPU(pack)
                 self.layoutSettling = false
                 self.pauseIfIdle()
             }

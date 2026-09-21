@@ -72,7 +72,26 @@ final class GraphAppModel: ObservableObject {
             $0.id.lowercased().contains(q)
                 || $0.name.lowercased().contains(q)
                 || $0.signature.lowercased().contains(q)
+                || $0.filePath.lowercased().contains(q)
         }
+    }
+
+    /// Sidebar groups — company subprojects as islands (mpm, libraries, …).
+    var nodesByIsland: [(island: String, nodes: [GraphNode])] {
+        let root = document.projectRoot
+        var buckets: [String: [GraphNode]] = [:]
+        for n in filteredNodes {
+            let key =
+                n.filePath.isEmpty
+                ? "external"
+                : IslandLayout.islandKey(filePath: n.filePath, projectRoot: root)
+            buckets[key, default: []].append(n)
+        }
+        return buckets.keys.sorted { a, b in
+            if a == "external" { return false }
+            if b == "external" { return true }
+            return (buckets[a]?.count ?? 0) > (buckets[b]?.count ?? 0)
+        }.map { ($0, buckets[$0] ?? []) }
     }
 
     var canAnalyze: Bool {
