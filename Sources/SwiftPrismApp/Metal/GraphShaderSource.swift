@@ -43,7 +43,8 @@ enum GraphShaderSource {
         out.position = clip;
         out.color = n.color;
         float w = max(abs(clip.w), 0.001);
-        out.pointSize = clamp((n.size * u.pointScale) / w * u.viewport.y * 0.045, 3.0, 48.0);
+        // Stronger perspective sizing so zooming in separates individual nodes.
+        out.pointSize = clamp((n.size * u.pointScale) / w * u.viewport.y * 0.07, 2.0, 96.0);
         return out;
     }
 

@@ -24,20 +24,21 @@ final class GraphAppModel: ObservableObject {
 
     private let watcher = ProjectWatcher()
     private weak var bookmarks: BookmarkStore?
-    private let zoomMin: CGFloat = 0.35
-    private let zoomMax: CGFloat = 4.0
+    /// Wide range so dense graphs (e.g. marlin-language) can inspect a single node.
+    private let zoomMin: CGFloat = 0.08
+    private let zoomMax: CGFloat = 80.0
     /// Bumps to drop stale background load results after rapid Open / Skip.
     private var loadGeneration: UInt64 = 0
     private let loadQueue = DispatchQueue(label: "app.codeprism.sot-load", qos: .userInitiated)
 
-    func zoomIn() { setGraphZoom(graphZoom * 1.12) }
-    func zoomOut() { setGraphZoom(graphZoom / 1.12) }
+    func zoomIn() { setGraphZoom(graphZoom * 1.2) }
+    func zoomOut() { setGraphZoom(graphZoom / 1.2) }
     func resetZoom() { setGraphZoom(1) }
     func setGraphZoom(_ value: CGFloat) {
         graphZoom = min(max(value, zoomMin), zoomMax)
     }
     func nudgeGraphZoom(deltaY: CGFloat) {
-        setGraphZoom(graphZoom * (deltaY > 0 ? 1.08 : 0.92))
+        setGraphZoom(graphZoom * (deltaY > 0 ? 1.12 : 0.89))
     }
 
     var detectedLanguageIds: [String] { detectedLanguages.map(\.languageId) }

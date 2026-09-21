@@ -43,7 +43,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "minus.magnifyingglass")
             }
-            .help("Zoom out (pinch or ⌘+scroll on graph)")
+            .help("Zoom out (pinch / scroll / toolbar). Double-click a node to focus.")
 
             Text("\(Int((model.graphZoom * 100).rounded()))%")
                 .font(.caption.monospacedDigit())
@@ -54,7 +54,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "plus.magnifyingglass")
             }
-            .help("Zoom in (pinch or ⌘+scroll on graph)")
+            .help("Zoom in (pinch / scroll / toolbar). Double-click a node to focus.")
 
             Button("Reset") { model.resetZoom() }
                 .disabled(abs(model.graphZoom - 1) < 0.01)

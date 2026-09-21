@@ -57,9 +57,12 @@ struct GraphMetalView: NSViewRepresentable {
             host.onSelect = { [weak self] id in self?.onSelect(id) }
             host.onZoomDelta = { [weak self] factor in
                 guard let self else { return }
-                let next = min(max(self.externalZoom * factor, 0.35), 4.0)
+                let next = min(max(self.externalZoom * factor, 0.08), 80.0)
                 self.externalZoom = next
                 self.onZoomChange(next)
+            }
+            host.onFocusRequest = { [weak self] in
+                self?.host?.focusOnSelection(suggestedZoom: max(self?.externalZoom ?? 1, 12))
             }
         }
 
@@ -68,7 +71,12 @@ struct GraphMetalView: NSViewRepresentable {
             let sig =
                 "\(document.nodes.count)|\(document.links.count)|\(document.generatedAt)|\(document.projectRoot)"
             host?.setZoom(zoom)
+            let selectionChanged = host?.rendererSelectedId != selectedId
             host?.setSelectedId(selectedId)
+            // Auto-frame newly selected node so zoom/orbit inspects it, not the cloud center.
+            if selectionChanged, let selectedId {
+                host?.focusOnNode(id: selectedId, suggestedZoom: 16, bumpZoom: zoom < 8)
+            }
             if forceRebuild || sig != signature {
                 signature = sig
                 host?.load(document: document)
@@ -83,6 +91,7 @@ final class GraphMetalHostView: NSView {
     var onSelect: ((String?) -> Void)?
     /// Multiplicative zoom factor for one gesture step (e.g. 1.08).
     var onZoomDelta: ((CGFloat) -> Void)?
+    var onFocusRequest: (() -> Void)?
 
     private var metalView: MTKView!
     private var renderer: GraphMetalRenderer!
@@ -90,6 +99,24 @@ final class GraphMetalHostView: NSView {
     private var lastDrag: NSPoint?
     private var didDrag = false
     private var lastGestureMagnification: CGFloat = 0
+    private var lastClickTime: TimeInterval = 0
+
+    var rendererSelectedId: String? { renderer?.selectedId }
+
+    func focusOnSelection(suggestedZoom: CGFloat) {
+        guard let id = renderer?.selectedId else { return }
+        focusOnNode(id: id, suggestedZoom: suggestedZoom, bumpZoom: true)
+    }
+
+    func focusOnNode(id: String, suggestedZoom: CGFloat, bumpZoom: Bool = true) {
+        renderer?.focus(on: id)
+        wakeRender()
+        guard bumpZoom else { return }
+        let current = max(CGFloat(renderer?.zoom ?? 1), 0.08)
+        if current < suggestedZoom * 0.9 {
+            onZoomDelta?(suggestedZoom / current)
+        }
+    }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -129,6 +156,9 @@ final class GraphMetalHostView: NSView {
         addGestureRecognizer(pinch)
         let click = NSClickGestureRecognizer(target: self, action: #selector(handleClick(_:)))
         addGestureRecognizer(click)
+        let doubleClick = NSClickGestureRecognizer(target: self, action: #selector(handleDoubleClick(_:)))
+        doubleClick.numberOfClicksRequired = 2
+        addGestureRecognizer(doubleClick)
     }
 
     func load(document: GraphDocument) {
@@ -230,6 +260,19 @@ final class GraphMetalHostView: NSView {
         }
     }
 
+    @objc private func handleDoubleClick(_ gesture: NSClickGestureRecognizer) {
+        guard !didDrag else { return }
+        let p = gesture.location(in: self)
+        if let id = renderer?.pickNode(at: p, in: bounds) {
+            onSelect?(id)
+            focusOnNode(id: id, suggestedZoom: 22, bumpZoom: true)
+        } else {
+            // Double-click empty space → reset focus to graph center (keep zoom).
+            renderer?.clearFocus()
+            wakeRender()
+        }
+    }
+
     private func installScrollMonitor() {
         removeScrollMonitor()
         scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
@@ -237,11 +280,14 @@ final class GraphMetalHostView: NSView {
             let loc = self.convert(event.locationInWindow, from: nil)
             guard self.bounds.contains(loc) else { return event }
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-            guard flags.contains(.command), !flags.contains(.control) else { return event }
+            // Plain two-finger scroll OR ⌘+scroll zooms (⌃+scroll left to system).
+            if flags.contains(.control) { return event }
             let dy = event.scrollingDeltaY
             if abs(dy) > 0.1 {
                 self.wakeRender()
-                self.onZoomDelta?(dy > 0 ? 1.08 : 0.92)
+                // Trackpad deltas are small; mouse wheels are larger.
+                let step: CGFloat = abs(dy) < 2 ? 1.10 : 1.18
+                self.onZoomDelta?(dy > 0 ? step : 1 / step)
             }
             return nil
         }
@@ -312,6 +358,8 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
     private var dragging = false
     private var radius: Float = 16
     private var baseDistance: Float = 16
+    /// Orbit pivot — origin by default; jumps to a node when focusing.
+    private var focusCenter: SIMD3<Float> = .zero
     private var lastTick = CACurrentMediaTime()
 
     init(device: MTLDevice, view: MTKView) {
@@ -389,8 +437,9 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
             }
             let n = max(ids.count, 1)
             let force = ForceLayout3D(nodeIds: ids, links: linksSnapshot.map { ($0.source, $0.target) })
-            force.linkDistance = n > 400 ? 3.2 : 4.0
-            force.charge = n > 300 ? 0 : -36
+            // Spread nodes so deep zoom can separate neighbors (marlin-language ~200–1k).
+            force.linkDistance = n > 400 ? 4.5 : 5.5
+            force.charge = n > 500 ? -8 : -42
 
             let seedPos = ids.map { force.positions[$0] ?? .zero }
             let seedPack = self.packGPU(
@@ -551,7 +600,20 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
     }
 
     private func updateCameraDistance() {
-        radius = baseDistance / max(zoom, 0.2)
+        // Allow getting very close for single-node inspection (marlin-scale graphs).
+        radius = max(0.25, baseDistance / max(zoom, 0.05))
+    }
+
+    func focus(on id: String) {
+        guard let idx = nodeIds.firstIndex(of: id), idx < positions.count else { return }
+        focusCenter = positions[idx]
+        selectedId = id
+        requestFrames()
+    }
+
+    func clearFocus() {
+        focusCenter = .zero
+        requestFrames()
     }
 
     func orbit(dx: Float, dy: Float) {
@@ -597,16 +659,19 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
 
     private func viewProjection(aspect: Float) -> simd_float4x4 {
         let eye = cameraEye()
-        let view = lookAt(eye: eye, center: .zero, up: SIMD3(0, 1, 0))
-        let proj = perspective(fovY: 50 * .pi / 180, aspect: aspect, near: 0.05, far: 800)
+        let view = lookAt(eye: eye, center: focusCenter, up: SIMD3(0, 1, 0))
+        let near: Float = radius < 2 ? 0.01 : 0.05
+        let far: Float = max(800, baseDistance * 20)
+        let proj = perspective(fovY: 50 * .pi / 180, aspect: aspect, near: near, far: far)
         return proj * view
     }
 
     private func cameraEye() -> SIMD3<Float> {
         let cp = cos(pitch), sp = sin(pitch)
         let cy = cos(yaw), sy = sin(yaw)
-        // Orbit around origin (matches prior SceneKit pivot).
-        return SIMD3(radius * cp * sy, radius * sp, radius * cp * cy)
+        // Orbit around focusCenter (selected node or graph origin).
+        let offset = SIMD3(radius * cp * sy, radius * sp, radius * cp * cy)
+        return focusCenter + offset
     }
 
     func pickNode(at point: NSPoint, in bounds: CGRect) -> String? {
