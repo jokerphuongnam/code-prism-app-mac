@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import Foundation
 
 /// Thin wrapper over a discovered plugin (catalog is never hardcoded).
@@ -194,21 +195,39 @@ enum BackendRunner {
         try run(proc, timeout: 180)
     }
 
-    /// Stop a child analyzer without bringing down the app (debugger-friendly).
+    /// Stop a child analyzer by **pid only** — never signal our own process group.
+    /// (Xcode shows `Thread 1: signal SIGTERM` if the app itself receives SIGTERM.)
     private static func stopChild(_ proc: Process) {
-        guard proc.isRunning else { return }
-        proc.interrupt()
+        let pid = proc.processIdentifier
+        let selfPid = ProcessInfo.processInfo.processIdentifier
+        guard pid > 0, pid != selfPid else { return }
+        if !proc.isRunning { return }
+
+        // Targeted signals — do not use Process.terminate() (can confuse debugger / groups).
+        _ = kill(pid, SIGINT)
+        var alive = true
+        for _ in 0..<15 {
+            usleep(100_000) // 100ms
+            if kill(pid, 0) != 0 {
+                alive = false
+                break
+            }
+        }
+        if alive {
+            _ = kill(pid, SIGTERM)
+            usleep(200_000)
+        }
+        if kill(pid, 0) == 0 {
+            _ = kill(pid, SIGKILL)
+        }
+        // Reap without blocking forever.
         let group = DispatchGroup()
         group.enter()
         DispatchQueue.global(qos: .utility).async {
             proc.waitUntilExit()
             group.leave()
         }
-        if group.wait(timeout: .now() + 1.5) == .timedOut {
-            proc.terminate()
-            // Brief wait so terminate settles before we touch pipes.
-            proc.waitUntilExit()
-        }
+        _ = group.wait(timeout: .now() + 1.0)
     }
 
     private static func run(_ proc: Process, timeout: TimeInterval) throws {

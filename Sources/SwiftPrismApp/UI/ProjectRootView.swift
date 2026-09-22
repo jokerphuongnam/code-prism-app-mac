@@ -24,21 +24,10 @@ struct ProjectRootView: View {
                 if model.projectRoot?.standardizedFileURL.path != path {
                     model.adoptProject(standardizedURL)
                 }
+                // Focus this project window only — do not close siblings (avoids SIGTERM under Xcode).
                 DispatchQueue.main.async {
-                    Self.collapseDuplicateProjectWindows(path: path)
+                    _ = WindowRouter.focusProject(id: ProjectWindowID(path: path))
                 }
             }
-    }
-
-    private static func collapseDuplicateProjectWindows(path: String) {
-        let matches = NSApp.windows.filter {
-            $0.identifier?.rawValue == path
-        }
-        guard matches.count > 1 else { return }
-        let keep = matches.first(where: \.isKeyWindow) ?? matches[0]
-        for w in matches where w !== keep {
-            w.close()
-        }
-        keep.makeKeyAndOrderFront(nil)
     }
 }

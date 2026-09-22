@@ -73,9 +73,9 @@ struct BookmarkWindow: View {
             openWindow(id: WindowRouter.bookmarksWindowId)
         }
         .onAppear {
-            // Dismiss accidental extra "Projects" windows from older builds / restores.
+            // Focus the real Projects window — never close windows (closing can SIGTERM under Xcode).
             DispatchQueue.main.async {
-                Self.collapseExtraBookmarksWindows()
+                WindowRouter.focusBookmarks()
             }
         }
     }
@@ -106,18 +106,6 @@ struct BookmarkWindow: View {
         openWindow(id: WindowRouter.projectWindowId, value: id)
     }
 
-    private static func collapseExtraBookmarksWindows() {
-        let bookmarks = NSApp.windows.filter {
-            $0.identifier?.rawValue == WindowRouter.bookmarksWindowId || $0.title == "Projects"
-        }
-        guard bookmarks.count > 1 else { return }
-        // Keep the key window (or first), close the rest.
-        let keep = bookmarks.first(where: \.isKeyWindow) ?? bookmarks[0]
-        for w in bookmarks where w !== keep {
-            w.close()
-        }
-        keep.makeKeyAndOrderFront(nil)
-    }
 }
 
 private struct BookmarkRow: View {
