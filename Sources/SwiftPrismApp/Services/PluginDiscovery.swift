@@ -35,7 +35,7 @@ enum PluginDiscovery {
         var version: String?
     }
 
-    /// Scan Application Support installs + local `code-prism/backends/*-prism`.
+    /// Scan Application Support + monorepo `code-prism/backends/<id>/` (+ legacy `*-prism`).
     static func discover() -> [DiscoveredPlugin] {
         var byId: [String: DiscoveredPlugin] = [:]
         let fm = FileManager.default
@@ -51,13 +51,17 @@ enum PluginDiscovery {
             }
         }
 
-        // 2) Checked-out backend repos (override / fill)
+        // 2) Monorepo backends (`backends/js`, `backends/marlin`, …) + legacy `*-prism`
         let backendsRoot = DemoPaths.backendsCheckoutRoot
         if let repos = try? fm.contentsOfDirectory(atPath: backendsRoot.path) {
-            for repo in repos where repo.hasSuffix("-prism") {
+            for repo in repos {
+                if repo.hasPrefix(".") { continue }
                 let dir = backendsRoot.appendingPathComponent(repo, isDirectory: true)
+                var isDir: ObjCBool = false
+                guard fm.fileExists(atPath: dir.path, isDirectory: &isDir), isDir.boolValue else {
+                    continue
+                }
                 if let plugin = loadPlugin(from: dir, preferBinName: nil) {
-                    // Prefer checkout if it has a runnable binary; else keep installed
                     if plugin.isExecutable || byId[plugin.id] == nil {
                         byId[plugin.id] = plugin
                     }
