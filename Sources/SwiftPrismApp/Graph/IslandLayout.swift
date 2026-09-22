@@ -96,9 +96,19 @@ enum IslandLayout {
         let useAtlas = !ProjectAtlas.nodes(projectRoot: projectRoot).isEmpty
         for n in nodes {
             if useAtlas, !n.filePath.isEmpty {
-                let scope = ProjectAtlas.scope(filePath: n.filePath, projectRoot: projectRoot)
+                let scope = ProjectAtlas.scope(
+                    filePath: n.filePath,
+                    projectRoot: projectRoot,
+                    language: languageKey(for: n)
+                )
                 scopeOf[n.id] = scope
-                let key = "\(scope.region) / \(scope.archipelago) / \(scope.file)"
+                // Loose / integration files: one pile per language (not per-file islands).
+                let key: String
+                if scope.isLoose {
+                    key = "ungrouped · \(scope.archipelago)"
+                } else {
+                    key = "\(scope.region) / \(scope.archipelago) / \(scope.file)"
+                }
                 islandOf[n.id] = key
                 buckets[key, default: []].append(n.id)
             } else {
@@ -109,6 +119,10 @@ enum IslandLayout {
         }
 
         let ordered = buckets.keys.sorted { a, b in
+            // Park ungrouped language piles after real projects.
+            let aLoose = a.hasPrefix("ungrouped")
+            let bLoose = b.hasPrefix("ungrouped")
+            if aLoose != bLoose { return !aLoose && bLoose }
             if a.hasPrefix("external") { return false }
             if b.hasPrefix("external") { return true }
             if a == "_noise" || a.hasPrefix("_noise") { return false }
@@ -160,21 +174,33 @@ enum IslandLayout {
             for (si, name) in fileKeys.enumerated() {
                 let ids = buckets[name] ?? []
                 guard !ids.isEmpty else { continue }
+                let isLoosePile = name.hasPrefix("ungrouped")
                 let localAngle = Float(si) / Float(max(fileKeys.count, 1)) * (.pi * 2)
-                let y: Float = name.contains("external") || name.contains("_noise") ? -8 : 0
-                let center = archCenter + SIMD3(cos(localAngle) * fileR, y, sin(localAngle) * fileR)
+                let y: Float =
+                    isLoosePile ? -14
+                    : (name.contains("external") || name.contains("_noise") ? -8 : 0)
+                // Park loose language piles on a wider ring so they don't tangle projects.
+                let looseBoost: Float = isLoosePile ? ringR * 0.35 : 0
+                let center =
+                    archCenter
+                    + SIMD3(cos(localAngle) * (fileR + looseBoost), y, sin(localAngle) * (fileR + looseBoost))
 
-                let localLinks: [(String, String)] = links.compactMap { link in
-                    guard idSet.contains(link.source), idSet.contains(link.target) else { return nil }
-                    guard islandOf[link.source] == name, islandOf[link.target] == name else { return nil }
-                    return (link.source, link.target)
-                }
+                // Loose piles: keep nodes, but do not wire springs (no edges "đi đâu").
+                let localLinks: [(String, String)] = isLoosePile
+                    ? []
+                    : links.compactMap { link in
+                        guard idSet.contains(link.source), idSet.contains(link.target) else { return nil }
+                        guard islandOf[link.source] == name, islandOf[link.target] == name else {
+                            return nil
+                        }
+                        return (link.source, link.target)
+                    }
 
                 let force = ForceLayout3D(nodeIds: ids, links: localLinks)
                 let n = ids.count
                 force.linkDistance = n > 80 ? 4.2 : 5.2
-                force.charge = n > 120 ? -12 : -36
-                force.centerStrength = 0.04
+                force.charge = isLoosePile ? (n > 80 ? -6 : -18) : (n > 120 ? -12 : -36)
+                force.centerStrength = isLoosePile ? 0.08 : 0.04
                 for _ in 0..<warmSteps {
                     _ = force.tick(1)
                 }

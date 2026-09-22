@@ -534,12 +534,23 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
             if work.isCancelled { return }
 
             let finalPos = ids.map { islanded.positions[$0] ?? .zero }
-            let scopedPairs: [(Int, Int, String)] = pairs.map { a, b, kind in
+            // Drop every edge that touches an ungrouped/loose pile — kept as a quiet language heap.
+            let scopedPairs: [(Int, Int, String)] = pairs.compactMap { a, b, kind in
                 let left = islanded.scopeOf[ids[a]]
                 let right = islanded.scopeOf[ids[b]]
+                if left?.isLoose == true || right?.isLoose == true { return nil }
+                let leftIsland = islanded.islandOf[ids[a]] ?? ""
+                let rightIsland = islanded.islandOf[ids[b]] ?? ""
+                if leftIsland.hasPrefix("ungrouped") || rightIsland.hasPrefix("ungrouped") {
+                    return nil
+                }
                 guard let left, let right else { return (a, b, kind) }
-                if left.file == right.file && left.archipelago == right.archipelago { return (a, b, "inner") }
-                if left.archipelago == right.archipelago && left.region == right.region { return (a, b, "arch") }
+                if left.file == right.file && left.archipelago == right.archipelago {
+                    return (a, b, "inner")
+                }
+                if left.archipelago == right.archipelago && left.region == right.region {
+                    return (a, b, "arch")
+                }
                 if left.region == right.region { return (a, b, "region") }
                 return (a, b, "outer")
             }

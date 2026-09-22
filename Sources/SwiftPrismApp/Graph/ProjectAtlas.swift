@@ -55,22 +55,49 @@ enum ProjectAtlas {
         var region: String
         var archipelago: String
         var file: String
+        /// Loose / integration / unscoped sources — kept, piled by language, not wired into projects.
+        var isLoose: Bool
     }
 
+    private static let loosePathSegments: Set<String> = [
+        "integration", "integrations", "examples", "example", "samples", "sample",
+        "fixtures", "testdata", "playgrounds", "playground", "snippets",
+    ]
+
     /// Where a source file sits: large island, archipelago, and file island.
-    static func scope(filePath: String, projectRoot: String) -> Scope {
+    static func scope(filePath: String, projectRoot: String, language: String = "") -> Scope {
         let nodes = nodes(projectRoot: projectRoot)
         let path = (filePath as NSString).standardizingPath
+        let file = (path as NSString).lastPathComponent
+        let lang = language.isEmpty ? languageFromPath(path) : language
+
+        if isLoosePath(path) {
+            return looseScope(file: file, language: lang)
+        }
+
         let leaf = nodes
             .filter { !$0.path.isEmpty && (path == $0.path || path.hasPrefix($0.path + "/")) }
             .max { a, b in
                 if a.path.count != b.path.count { return a.path.count < b.path.count }
                 return a.flavor != "xcode" && b.flavor == "xcode"
             }
-        let file = (path as NSString).lastPathComponent
         guard let leaf else {
-            return Scope(region: IslandLayout.projectKey(filePath: filePath, projectRoot: projectRoot), archipelago: "root", file: file)
+            // No Cargo/Xcode/SPM/… owner → language pile, not a fake "root" island.
+            return looseScope(file: file, language: lang)
         }
+
+        // Matched only a broad folder group (not a real package/app) → also loose.
+        if leaf.flavor == "group" {
+            let tighter = nodes.contains {
+                $0.flavor != "group"
+                    && !$0.path.isEmpty
+                    && (path == $0.path || path.hasPrefix($0.path + "/"))
+            }
+            if !tighter {
+                return looseScope(file: file, language: lang)
+            }
+        }
+
         let byId = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
         var regionNode = leaf
         var guardrail = 0
@@ -98,7 +125,37 @@ enum ProjectAtlas {
                 arch = "\(owner?.name ?? leaf.name)/\(target)"
             }
         }
-        return Scope(region: region, archipelago: arch, file: file.isEmpty ? leaf.name : file)
+        return Scope(
+            region: region,
+            archipelago: arch,
+            file: file.isEmpty ? leaf.name : file,
+            isLoose: false
+        )
+    }
+
+    private static func looseScope(file: String, language: String) -> Scope {
+        let lang = language.isEmpty ? "unknown" : language
+        return Scope(
+            region: "ungrouped",
+            archipelago: lang,
+            file: file.isEmpty ? lang : file,
+            isLoose: true
+        )
+    }
+
+    private static func isLoosePath(_ path: String) -> Bool {
+        let parts = Set(path.split(separator: "/").map { $0.lowercased() })
+        return !parts.isDisjoint(with: loosePathSegments)
+    }
+
+    /// Only extensions claimed by an installed plugin.
+    static func languageFromPath(_ path: String) -> String {
+        let ext = (path as NSString).pathExtension.lowercased()
+        guard !ext.isEmpty else { return "" }
+        for plugin in PluginDiscovery.discover() where plugin.canDetectLanguage {
+            if plugin.extensions.contains(ext) { return plugin.id }
+        }
+        return ""
     }
 }
 
