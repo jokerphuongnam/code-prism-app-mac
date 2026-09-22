@@ -50,6 +50,9 @@ struct GraphMetalView: NSViewRepresentable {
         private weak var host: GraphMetalHostView?
         private var signature = ""
         private var externalZoom: CGFloat = 1
+        private var publishZoomWork: DispatchWorkItem?
+        /// Ignore model→view zoom pushes briefly after a gesture (prevents feedback lag).
+        private var ignoreModelZoomUntil: CFTimeInterval = 0
 
         init(onSelect: @escaping (String?) -> Void, onZoomChange: @escaping (CGFloat) -> Void) {
             self.onSelect = onSelect
@@ -59,18 +62,13 @@ struct GraphMetalView: NSViewRepresentable {
         func attach(host: GraphMetalHostView) {
             self.host = host
             host.onSelect = { [weak self] id in self?.onSelect(id) }
+            // Zoom stays on the Metal view during the gesture — SwiftUI only gets a throttled sync.
             host.onZoomDelta = { [weak self] factor in
                 guard let self else { return }
-                if factor < 1 {
-                    // Zooming out → return pivot to content center so every island reappears.
-                    self.host?.pullFocusHome(strength: Float(1 - factor))
-                } else {
-                    // Zooming in toward empty space → snap pivot to a real island/node.
-                    self.host?.ensureInspectPivot()
-                }
-                let next = min(max(self.externalZoom * factor, 0.35), 40.0)
-                self.externalZoom = next
-                self.onZoomChange(next)
+                self.host?.nudgeZoomLocal(factor: factor)
+                self.externalZoom = CGFloat(self.host?.currentZoom ?? Float(self.externalZoom))
+                self.ignoreModelZoomUntil = CACurrentMediaTime() + 0.2
+                self.schedulePublishZoom()
             }
             host.onFocusRequest = { [weak self] in
                 self?.host?.focusOnSelection(suggestedZoom: max(self?.externalZoom ?? 1, 12))
@@ -78,15 +76,31 @@ struct GraphMetalView: NSViewRepresentable {
             host.onFitAll = { [weak self] zoom in
                 guard let self else { return }
                 self.externalZoom = zoom
+                self.ignoreModelZoomUntil = CACurrentMediaTime() + 0.2
                 self.onZoomChange(zoom)
             }
         }
 
+        private func schedulePublishZoom() {
+            publishZoomWork?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                self.onZoomChange(self.externalZoom)
+            }
+            publishZoomWork = work
+            // Toolbar % updates after the finger settles — not every scroll tick.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: work)
+        }
+
         func apply(document: GraphDocument, selectedId: String?, zoom: CGFloat, forceRebuild: Bool) {
-            externalZoom = zoom
             let sig =
                 "\(document.nodes.count)|\(document.links.count)|\(document.generatedAt)|\(document.projectRoot)"
-            host?.setZoom(zoom)
+            if CACurrentMediaTime() >= ignoreModelZoomUntil,
+               abs(zoom - externalZoom) > 0.001
+            {
+                externalZoom = zoom
+                host?.setZoom(zoom)
+            }
             let selectionChanged = host?.rendererSelectedId != selectedId
             host?.setSelectedId(selectedId)
             // Auto-frame newly selected node so zoom/orbit inspects it, not the cloud center.
@@ -120,6 +134,7 @@ final class GraphMetalHostView: NSView {
     private var lastClickTime: TimeInterval = 0
 
     var rendererSelectedId: String? { renderer?.selectedId }
+    var currentZoom: Float { renderer?.zoom ?? 1 }
 
     func focusOnSelection(suggestedZoom: CGFloat) {
         guard let id = renderer?.selectedId else { return }
@@ -133,8 +148,15 @@ final class GraphMetalHostView: NSView {
         let target = suggestedZoom > 1 ? suggestedZoom : CGFloat(inspectZoom)
         let current = max(CGFloat(renderer?.zoom ?? 1), 0.35)
         if current < target * 0.85 {
-            onZoomDelta?(target / current)
+            nudgeZoomLocal(factor: target / current)
+            onFitAll?(CGFloat(currentZoom)) // absolute publish for toolbar %
         }
+    }
+
+    /// Apply zoom on the GPU camera immediately — do not round-trip through SwiftUI each tick.
+    func nudgeZoomLocal(factor: CGFloat) {
+        renderer?.nudgeZoom(factor: Float(factor))
+        wakeRender(fps: 60)
     }
 
     func pullFocusHome(strength: Float) {
@@ -215,9 +237,9 @@ final class GraphMetalHostView: NSView {
         wakeRender()
     }
 
-    private func wakeRender() {
+    private func wakeRender(fps: Int = 30) {
         metalView?.isPaused = false
-        metalView?.preferredFramesPerSecond = 30
+        metalView?.preferredFramesPerSecond = fps
         metalView?.setNeedsDisplay(metalView.bounds)
     }
 
@@ -271,8 +293,7 @@ final class GraphMetalHostView: NSView {
     override func magnify(with event: NSEvent) {
         let m = event.magnification
         if abs(m) > 0.0005 {
-            wakeRender()
-            onZoomDelta?(max(0.5, min(1.8, 1 + m * 1.45)))
+            onZoomDelta?(max(0.85, min(1.18, 1 + m * 1.1)))
         }
     }
 
@@ -280,14 +301,17 @@ final class GraphMetalHostView: NSView {
         switch gesture.state {
         case .began:
             lastGestureMagnification = 0
-            wakeRender()
+            wakeRender(fps: 60)
         case .changed:
             let delta = gesture.magnification - lastGestureMagnification
             lastGestureMagnification = gesture.magnification
             if abs(delta) > 0.0005 {
-                wakeRender()
-                onZoomDelta?(max(0.5, min(1.8, 1 + delta * 1.45)))
+                // Smaller steps → fewer SwiftUI syncs feel smoother under trackpad flood.
+                onZoomDelta?(max(0.88, min(1.14, 1 + delta * 1.05)))
             }
+        case .ended, .cancelled:
+            lastGestureMagnification = 0
+            metalView?.preferredFramesPerSecond = 30
         default:
             lastGestureMagnification = 0
         }
@@ -328,10 +352,9 @@ final class GraphMetalHostView: NSView {
             // Plain two-finger scroll OR ⌘+scroll zooms (⌃+scroll left to system).
             if flags.contains(.control) { return event }
             let dy = event.scrollingDeltaY
-            if abs(dy) > 0.1 {
-                self.wakeRender()
-                // Trackpad deltas are small; mouse wheels are larger.
-                let step: CGFloat = abs(dy) < 2 ? 1.10 : 1.18
+            if abs(dy) > 0.05 {
+                // Trackpad floods scroll events — keep steps tiny; zoom is applied locally.
+                let step: CGFloat = abs(dy) < 1.5 ? 1.04 : 1.10
                 self.onZoomDelta?(dy > 0 ? step : 1 / step)
             }
             return nil
@@ -637,6 +660,19 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
         // zoom 1 → fitRadius (full overview); zoom up → closer inspect; zoom down → wider.
         let z = max(zoom, 0.05)
         radius = min(fitRadius * maxOverviewMul, max(minInspectRadius, fitRadius / z))
+    }
+
+    /// Gesture zoom — cheap camera update only (no buffer rebuild).
+    func nudgeZoom(factor: Float) {
+        let f = max(0.85, min(1.18, factor))
+        if f < 1 {
+            pullFocusHome(strength: 1 - f)
+        } else if zoom < 1.25 {
+            // Only when leaving overview — avoid doing this every scroll tick.
+            ensureInspectPivot()
+        }
+        zoom = min(40, max(0.35, zoom * f))
+        requestFrames()
     }
 
     private func recomputeFitRadius() {
