@@ -165,7 +165,7 @@ final class GraphMetalHostView: NSView {
     }
 
     func ensureInspectPivot() {
-        renderer?.ensureInspectPivot()
+        renderer?.ensureInspectPivot(force: true)
         wakeRender()
     }
 
@@ -674,16 +674,24 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
         radius = min(fitRadius * maxOverviewMul, max(minInspectRadius, fitRadius / z))
     }
 
+    /// True while the look-at is still the empty middle of the archipelago.
+    private var isOnOverviewPivot: Bool {
+        let slack = max(fitRadius * 0.1, 25)
+        return length(focusCenter - contentCentroid) < slack
+    }
+
     /// Gesture zoom — cheap camera update only (no buffer rebuild).
     func nudgeZoom(factor: Float) {
         let f = max(0.85, min(1.18, factor))
         if f < 1 {
             pullFocusHome(strength: 1 - f)
-        } else if zoom < 1.25 {
-            // Only when leaving overview — avoid doing this every scroll tick.
-            ensureInspectPivot()
+        } else if isOnOverviewPivot {
+            // Archipelagos leave a void at the centroid — snap onto a real island/node
+            // BEFORE dollying in, or the whole graph flies off-screen.
+            ensureInspectPivot(force: true)
         }
         zoom = min(40, max(0.35, zoom * f))
+        updateCameraDistance()
         requestFrames()
     }
 
@@ -735,9 +743,9 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
         requestFrames()
     }
 
-    /// Zooming in with pivot still on empty centroid → jump to selected / largest island.
-    func ensureInspectPivot() {
-        if length_squared(focusCenter - contentCentroid) > 4 { return }
+    /// Jump look-at onto selected node, largest island, or nearest real node.
+    func ensureInspectPivot(force: Bool = false) {
+        if !force && !isOnOverviewPivot { return }
         if let sel = selectedId, let idx = nodeIds.firstIndex(of: sel), idx < positions.count {
             focusCenter = positions[idx]
             requestFrames()
@@ -746,7 +754,22 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
         if let best = islandCenters.max(by: { $0.nodeCount < $1.nodeCount }) {
             focusCenter = best.center
             requestFrames()
+            return
         }
+        // Fallback: node closest to current pivot / centroid (never stay in the void).
+        guard !positions.isEmpty else { return }
+        let origin = focusCenter
+        var best = positions[0]
+        var bestD = length_squared(best - origin)
+        for p in positions {
+            let d = length_squared(p - origin)
+            if d < bestD {
+                bestD = d
+                best = p
+            }
+        }
+        focusCenter = best
+        requestFrames()
     }
 
     /// Frame every island: pivot at content center, zoom 1 = full overview.
@@ -804,7 +827,8 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
     private func viewProjection(aspect: Float) -> simd_float4x4 {
         let eye = cameraEye()
         let view = lookAt(eye: eye, center: focusCenter, up: SIMD3(0, 1, 0))
-        let near: Float = max(0.05, radius * 0.01)
+        // Tiny near plane when close so focused nodes aren't clipped away.
+        let near: Float = max(0.01, min(0.35, radius * 0.004))
         let far: Float = max(3_000, max(radius, fitRadius) * 50)
         let proj = perspective(fovY: 55 * .pi / 180, aspect: aspect, near: near, far: far)
         return proj * view
