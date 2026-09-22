@@ -534,18 +534,27 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
             if work.isCancelled { return }
 
             let finalPos = ids.map { islanded.positions[$0] ?? .zero }
+            let scopedPairs: [(Int, Int, String)] = pairs.map { a, b, kind in
+                let left = islanded.scopeOf[ids[a]]
+                let right = islanded.scopeOf[ids[b]]
+                guard let left, let right else { return (a, b, kind) }
+                if left.file == right.file && left.archipelago == right.archipelago { return (a, b, "inner") }
+                if left.archipelago == right.archipelago && left.region == right.region { return (a, b, "arch") }
+                if left.region == right.region { return (a, b, "region") }
+                return (a, b, "outer")
+            }
             let pack = self.packGPU(
                 ids: ids,
                 flavors: flavorsLocal,
                 positions: finalPos,
-                linkPairs: pairs,
+                linkPairs: scopedPairs,
                 selectedId: selected
             )
             DispatchQueue.main.async {
                 guard !work.isCancelled else { return }
                 self.nodeIds = ids
                 self.flavors = flavorsLocal
-                self.linkPairs = pairs
+                self.linkPairs = scopedPairs
                 self.layout = nil
                 self.positions = finalPos
                 self.islandCenters = islanded.islandCenters
@@ -625,10 +634,13 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
             if idx >= maxLinks { break }
             let (a, b, kind) = pair
             guard a < positions.count, b < positions.count else { continue }
-            let col: SIMD4<Float> =
-                kind == "call"
-                ? SIMD4(0.25, 0.55, 1.0, 0.55)
-                : SIMD4(0.55, 0.55, 0.58, 0.35)
+            let col: SIMD4<Float> = switch kind {
+            case "inner", "call": SIMD4(0.24, 0.78, 1.0, 0.7)
+            case "arch": SIMD4(0.24, 0.78, 1.0, 0.45)
+            case "region": SIMD4(0.75, 0.52, 0.98, 0.7)
+            case "outer": SIMD4(1.0, 0.62, 0.26, 0.75)
+            default: SIMD4(0.55, 0.55, 0.58, 0.35)
+            }
             lines.append(GPULine(position: positions[a], color: col))
             lines.append(GPULine(position: positions[b], color: col))
         }

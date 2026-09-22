@@ -9,6 +9,7 @@ enum IslandLayout {
         var positions: [String: SIMD3<Float>]
         /// nodeId → island key
         var islandOf: [String: String]
+        var scopeOf: [String: ProjectAtlas.Scope] = [:]
         var islandCenters: [(name: String, center: SIMD3<Float>, nodeCount: Int)]
     }
 
@@ -89,12 +90,22 @@ enum IslandLayout {
         let multiLang = langs.count > 1
 
         var islandOf: [String: String] = [:]
+        var scopeOf: [String: ProjectAtlas.Scope] = [:]
         var buckets: [String: [String]] = [:]
 
+        let useAtlas = !ProjectAtlas.nodes(projectRoot: projectRoot).isEmpty
         for n in nodes {
-            let key = islandKey(for: n, projectRoot: projectRoot, multiLang: multiLang)
-            islandOf[n.id] = key
-            buckets[key, default: []].append(n.id)
+            if useAtlas, !n.filePath.isEmpty {
+                let scope = ProjectAtlas.scope(filePath: n.filePath, projectRoot: projectRoot)
+                scopeOf[n.id] = scope
+                let key = "\(scope.region) / \(scope.archipelago) / \(scope.file)"
+                islandOf[n.id] = key
+                buckets[key, default: []].append(n.id)
+            } else {
+                let key = islandKey(for: n, projectRoot: projectRoot, multiLang: multiLang)
+                islandOf[n.id] = key
+                buckets[key, default: []].append(n.id)
+            }
         }
 
         let ordered = buckets.keys.sorted { a, b in
@@ -113,37 +124,45 @@ enum IslandLayout {
         var centers: [(name: String, center: SIMD3<Float>, nodeCount: Int)] = []
         let idSet = Set(nodes.map(\.id))
 
-        // Group islands that share a project so sibling languages sit as a small cluster.
-        let projectGroups: [String: [String]] = {
-            var g: [String: [String]] = [:]
-            for name in ordered {
-                let project = name.split(separator: "·").first.map { $0.trimmingCharacters(in: .whitespaces) } ?? name
-                g[project, default: []].append(name)
-            }
-            return g
-        }()
-        let projectOrder = ordered.map {
-            $0.split(separator: "·").first.map { $0.trimmingCharacters(in: .whitespaces) } ?? $0
+        func splitKey(_ key: String) -> (region: String, arch: String) {
+            let bits = key.components(separatedBy: " / ")
+            if bits.count >= 2 { return (bits[0], bits[1]) }
+            let project = key.split(separator: "·").first.map { $0.trimmingCharacters(in: .whitespaces) } ?? key
+            return (project, key)
         }
-        var uniqueProjects: [String] = []
-        for p in projectOrder where !uniqueProjects.contains(p) {
-            uniqueProjects.append(p)
+        // Large island → archipelago → file island.
+        var regionOrder: [String] = []
+        var archByRegion: [String: [String]] = [:]
+        var filesByArch: [String: [String]] = [:]
+        for name in ordered {
+            let parts = splitKey(name)
+            if !regionOrder.contains(parts.region) { regionOrder.append(parts.region) }
+            let archKey = parts.region + "\u{1f}" + parts.arch
+            if archByRegion[parts.region]?.contains(archKey) != true {
+                archByRegion[parts.region, default: []].append(archKey)
+            }
+            filesByArch[archKey, default: []].append(name)
         }
 
         var islandIndex = 0
-        for (pi, project) in uniqueProjects.enumerated() {
-            let siblings = projectGroups[project] ?? [project]
-            let projectAngle = Float(pi) / Float(max(uniqueProjects.count, 1)) * (.pi * 2)
+        for (pi, region) in regionOrder.enumerated() {
+            let archKeys = archByRegion[region] ?? []
+            let projectAngle = Float(pi) / Float(max(regionOrder.count, 1)) * (.pi * 2)
             let projectCenter = SIMD3(cos(projectAngle) * ringR, 0, sin(projectAngle) * ringR)
+            let archR: Float = archKeys.count > 1 ? 16 + Float(archKeys.count) * 3 : 0
 
-            for (si, name) in siblings.enumerated() {
+            for (ai, archKey) in archKeys.enumerated() {
+                let fileKeys = filesByArch[archKey] ?? []
+                let archAngle = Float(ai) / Float(max(archKeys.count, 1)) * (.pi * 2)
+                let archCenter = projectCenter + SIMD3(cos(archAngle) * archR, Float(ai) * 0.15, sin(archAngle) * archR)
+                let fileR: Float = fileKeys.count > 1 ? 6 + Float(fileKeys.count) * 0.35 : 0
+
+            for (si, name) in fileKeys.enumerated() {
                 let ids = buckets[name] ?? []
                 guard !ids.isEmpty else { continue }
-                // Sibling languages offset around the project center.
-                let localR: Float = siblings.count > 1 ? 10 + Float(ids.count) * 0.08 : 0
-                let localAngle = Float(si) / Float(max(siblings.count, 1)) * (.pi * 2)
-                let y: Float = name.contains("external") || name.contains("_noise") ? -8 : Float(si) * 0.4
-                let center = projectCenter + SIMD3(cos(localAngle) * localR, y, sin(localAngle) * localR)
+                let localAngle = Float(si) / Float(max(fileKeys.count, 1)) * (.pi * 2)
+                let y: Float = name.contains("external") || name.contains("_noise") ? -8 : 0
+                let center = archCenter + SIMD3(cos(localAngle) * fileR, y, sin(localAngle) * fileR)
 
                 let localLinks: [(String, String)] = links.compactMap { link in
                     guard idSet.contains(link.source), idSet.contains(link.target) else { return nil }
@@ -170,8 +189,9 @@ enum IslandLayout {
                 }
                 islandIndex += 1
             }
+            }
         }
 
-        return Result(positions: positions, islandOf: islandOf, islandCenters: centers)
+        return Result(positions: positions, islandOf: islandOf, scopeOf: scopeOf, islandCenters: centers)
     }
 }

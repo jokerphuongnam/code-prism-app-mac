@@ -30,6 +30,7 @@
 		A25E74E98239985B771FB89F /* GraphSceneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9811EDADCFE502AB6AB5FF33 /* GraphSceneView.swift */; };
 		B6D3F54767878C1768867C85 /* BackendPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A25EA757E5BC1D7F8254277 /* BackendPlugin.swift */; };
 		BB6DB7E814D7E8F5EC1AD8DD /* SwiftPrismApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD060DA8EF71CF3C9D7F747 /* SwiftPrismApp.swift */; };
+		DB6EC9597478518E6A468D38 /* ProjectAtlas.swift in Sources */ = {isa = PBXBuildFile; fileRef = C61DA32AD27A7F37600911DF /* ProjectAtlas.swift */; };
 		DD64433BD5BC119B6CAFF570 /* GraphModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B75145A6ACC033381925292A /* GraphModels.swift */; };
 		F36627B08BC01605DB37A7F3 /* GraphShaderSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5A9E399ED584A00B585644 /* GraphShaderSource.swift */; };
 		F728D33448CCBE0D2CECAE36 /* ProjectRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 558194B2E1A87C41D81D27DE /* ProjectRootView.swift */; };
@@ -60,6 +61,7 @@
 		B678DE3AE90FBD9E3112035D /* BookmarkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkStore.swift; sourceTree = "<group>"; };
 		B75145A6ACC033381925292A /* GraphModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphModels.swift; sourceTree = "<group>"; };
 		B9D736EB5F4A2AF442682D76 /* PluginDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginDiscovery.swift; sourceTree = "<group>"; };
+		C61DA32AD27A7F37600911DF /* ProjectAtlas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectAtlas.swift; sourceTree = "<group>"; };
 		CC506CAC35E25F7753C7B4EF /* NodeGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeGeometry.swift; sourceTree = "<group>"; };
 		F53173912AFA322EA7E7E8ED /* GraphLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphLoader.swift; sourceTree = "<group>"; };
 		FB82A81CF358FACC428C6B98 /* GraphAppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphAppModel.swift; sourceTree = "<group>"; };
@@ -75,6 +77,7 @@
 				F53173912AFA322EA7E7E8ED /* GraphLoader.swift */,
 				B75145A6ACC033381925292A /* GraphModels.swift */,
 				957675AD2426FA38A844DA9B /* IslandLayout.swift */,
+				C61DA32AD27A7F37600911DF /* ProjectAtlas.swift */,
 			);
 			path = Graph;
 			sourceTree = "<group>";
@@ -241,6 +244,7 @@
 				0ACC7A9FB398E05711331608 /* LanguageDetect.swift in Sources */,
 				5172F38EBAE250A6DF331BB6 /* NodeGeometry.swift in Sources */,
 				36DC679891FDE6ED4CB86508 /* PluginDiscovery.swift in Sources */,
+				DB6EC9597478518E6A468D38 /* ProjectAtlas.swift in Sources */,
 				F728D33448CCBE0D2CECAE36 /* ProjectRootView.swift in Sources */,
 				7877EDE264601AF6B6AF33DD /* ProjectWatcher.swift in Sources */,
 				21EF0993105B6146F589FCCF /* SoTCache.swift in Sources */,
