@@ -95,7 +95,10 @@ enum IslandLayout {
 
         let useAtlas = !ProjectAtlas.nodes(projectRoot: projectRoot).isEmpty
         for n in nodes {
-            if useAtlas, !n.filePath.isEmpty {
+            if !n.group.isEmpty {
+                islandOf[n.id] = n.group
+                buckets[n.group, default: []].append(n.id)
+            } else if useAtlas, !n.filePath.isEmpty {
                 let scope = ProjectAtlas.scope(
                     filePath: n.filePath,
                     projectRoot: projectRoot,

@@ -77,21 +77,32 @@ enum GraphLoader {
     private static func fromFlat(_ nodes: [FlatGraphNode], projectRoot: String, generatedAt: String) -> GraphDocument {
         var outNodes: [GraphNode] = []
         var links: [GraphLink] = []
-        for n in nodes {
-            outNodes.append(
-                GraphNode(
+        func walk(_ n: FlatGraphNode, chain: [String]) {
+            let calls = n.calls ?? []
+            let isLeaf = n.kind == "leaf" || ((n.nodes ?? []).isEmpty && n.kind != "project" && n.kind != "archipelago")
+            if isLeaf {
+                var node = GraphNode(
                     id: n.id,
                     name: n.name,
-                    flavor: n.flavor,
+                    flavor: n.flavor ?? "symbol",
                     filePath: n.location?.absPath ?? "",
                     line: n.location?.line ?? 0,
                     signature: n.node_context ?? n.name,
-                    dependencies: n.calls ?? []
+                    dependencies: calls.map(\.target)
                 )
-            )
-            for c in n.calls ?? [] {
-                links.append(GraphLink(source: n.id, target: c, kind: "call"))
+                node.group = chain.joined(separator: " / ")
+                outNodes.append(node)
+                for c in calls where c.kind == "call" || c.kind == "depends" {
+                    links.append(GraphLink(source: n.id, target: c.target, kind: c.kind))
+                }
             }
+            let next = isLeaf ? chain : chain + [n.name]
+            for child in n.nodes ?? [] { walk(child, chain: next) }
+        }
+        for n in nodes {
+            let chain = n.kind == "project" ? [] : [n.name]
+            for child in n.nodes ?? [] { walk(child, chain: chain) }
+            if n.kind == "leaf" { walk(n, chain: []) }
         }
         return GraphDocument(projectRoot: projectRoot, generatedAt: generatedAt, nodes: outNodes, links: links)
     }

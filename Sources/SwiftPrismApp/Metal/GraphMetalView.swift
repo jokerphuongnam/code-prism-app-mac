@@ -533,9 +533,9 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
             )
             if work.isCancelled { return }
 
-            let finalPos = ids.map { islanded.positions[$0] ?? .zero }
+            var finalPos = ids.map { islanded.positions[$0] ?? .zero }
             // Drop every edge that touches an ungrouped/loose pile — kept as a quiet language heap.
-            let scopedPairs: [(Int, Int, String)] = pairs.compactMap { a, b, kind in
+            var scopedPairs: [(Int, Int, String)] = pairs.compactMap { a, b, kind in
                 let left = islanded.scopeOf[ids[a]]
                 let right = islanded.scopeOf[ids[b]]
                 if left?.isLoose == true || right?.isLoose == true { return nil }
@@ -553,6 +553,20 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
                 }
                 if left.region == right.region { return (a, b, "region") }
                 return (a, b, "outer")
+            }
+            for link in linksSnapshot where link.kind == "depends" || link.target.hasPrefix("island:") {
+                guard let source = idToIndex[link.source] else { continue }
+                let island = link.target.replacingOccurrences(of: "island:", with: "")
+                let members = ids.indices.filter { i in
+                    let group = nodesSnapshot[i].group
+                    return group == island || group.hasPrefix(island + " / ")
+                }
+                guard !members.isEmpty else { continue }
+                var center = SIMD3<Float>(repeating: 0)
+                for i in members { center += finalPos[i] }
+                center /= Float(members.count)
+                finalPos.append(center)
+                scopedPairs.append((source, finalPos.count - 1, "outer"))
             }
             let pack = self.packGPU(
                 ids: ids,

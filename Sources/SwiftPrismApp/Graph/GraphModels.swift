@@ -12,6 +12,8 @@ struct GraphNode: Identifiable, Hashable {
     var dependencies: [String]
     /// Prism language id when known (`swift`, `marlin`, …). Empty if unspecified.
     var language: String = ""
+    /// Parent archipelagos, outer to inner. The view draws only leaves inside this area.
+    var group: String = ""
 }
 
 struct GraphLink: Identifiable, Hashable {
@@ -64,11 +66,46 @@ struct FlatGraphDocument: Decodable {
 struct FlatGraphNode: Decodable {
     var id: String
     var name: String
-    var flavor: String
+    var kind: String?
+    var flavor: String?
     var location: FlatLocation?
     var parents: [String]?
-    var calls: [String]?
+    var calls: [FlatCall]?
+    var nodes: [FlatGraphNode]?
     var node_context: String?
+}
+
+enum FlatCall: Decodable {
+    case id(String)
+    case link(target: String, kind: String)
+
+    var target: String {
+        switch self {
+        case .id(let value): return value
+        case .link(let target, _): return target
+        }
+    }
+
+    var kind: String {
+        switch self {
+        case .id: return "call"
+        case .link(_, let kind): return kind
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        if let text = try? decoder.singleValueContainer().decode(String.self) {
+            self = .id(text)
+            return
+        }
+        let box = try decoder.container(keyedBy: CodingKeys.self)
+        self = .link(
+            target: try box.decode(String.self, forKey: .target),
+            kind: try box.decodeIfPresent(String.self, forKey: .kind) ?? "call"
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey { case target, kind }
 }
 
 struct FlatLocation: Decodable {
