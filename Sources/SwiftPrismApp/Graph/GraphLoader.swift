@@ -77,10 +77,12 @@ enum GraphLoader {
     private static func fromFlat(_ nodes: [FlatGraphNode], projectRoot: String, generatedAt: String) -> GraphDocument {
         var outNodes: [GraphNode] = []
         var links: [GraphLink] = []
+        var seen = Set<String>()
         func walk(_ n: FlatGraphNode, chain: [String]) {
             let calls = n.calls ?? []
             let isLeaf = n.kind == "leaf" || ((n.nodes ?? []).isEmpty && n.kind != "project" && n.kind != "archipelago")
             if isLeaf {
+                guard seen.insert(n.id).inserted else { return }
                 var node = GraphNode(
                     id: n.id,
                     name: n.name,

@@ -515,7 +515,12 @@ final class GraphMetalRenderer: NSObject, MTKViewDelegate {
             guard let self else { return }
             let ids = nodesSnapshot.map(\.id)
             let flavorsLocal = nodesSnapshot.map(\.flavor)
-            let idToIndex = Dictionary(uniqueKeysWithValues: ids.enumerated().map { ($0.element, $0.offset) })
+            // SoT can emit the same id twice. Keep the first index; a trap here closes the app.
+            var idToIndex: [String: Int] = [:]
+            idToIndex.reserveCapacity(ids.count)
+            for (offset, id) in ids.enumerated() where idToIndex[id] == nil {
+                idToIndex[id] = offset
+            }
             let pairs: [(Int, Int, String)] = linksSnapshot.compactMap { link in
                 guard let a = idToIndex[link.source], let b = idToIndex[link.target] else { return nil }
                 return (a, b, link.kind)

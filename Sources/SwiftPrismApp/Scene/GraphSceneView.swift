@@ -271,7 +271,7 @@ struct GraphSceneView: NSViewRepresentable {
             targetZoom = zoom
             visibleIds.removeAll(keepingCapacity: true)
             nodeMap.removeAll(keepingCapacity: true)
-            nodeById = Dictionary(uniqueKeysWithValues: document.nodes.map { ($0.id, $0) })
+            nodeById = Dictionary(document.nodes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
             let scene = SCNScene()
             scene.background.contents = NSColor(calibratedWhite: 0.07, alpha: 1)

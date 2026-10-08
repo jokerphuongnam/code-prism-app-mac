@@ -26,5 +26,16 @@
 	<true/>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>app.swiftprism.viewer</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>codeprism</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

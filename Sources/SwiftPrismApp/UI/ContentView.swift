@@ -18,7 +18,9 @@ struct ContentView: View {
         .toolbar {
             ToolbarItemGroup {
                 Button("Projects") {
-                    WindowRouter.focusBookmarks()
+                    AppDelegate.userOpenedHome = true
+                    if WindowRouter.focusBookmarksIfVisible() { return }
+                    openWindow(id: WindowRouter.bookmarksWindowId)
                 }
                 Button("Open Other…") {
                     if let url = bookmarks.pickAndRemember() {

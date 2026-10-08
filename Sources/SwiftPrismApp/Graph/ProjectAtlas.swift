@@ -98,7 +98,7 @@ enum ProjectAtlas {
             }
         }
 
-        let byId = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
+        let byId = Dictionary(nodes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         var regionNode = leaf
         var guardrail = 0
         while guardrail < 12, let parent = regionNode.parents.first, let next = byId[parent] {

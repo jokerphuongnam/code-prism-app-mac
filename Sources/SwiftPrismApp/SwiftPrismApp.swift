@@ -19,6 +19,9 @@ struct SwiftPrismApp: App {
         }
         .defaultSize(width: 520, height: 560)
         .commands {
+            CommandGroup(after: .appInfo) {
+                HomeMenuButton()
+            }
             CommandGroup(replacing: .newItem) {
                 Button("Open…") {
                     NotificationCenter.default.post(name: .codePrismOpenProject, object: nil)
@@ -44,4 +47,17 @@ struct SwiftPrismApp: App {
 
 extension Notification.Name {
     static let codePrismOpenProject = Notification.Name("codePrismOpenProject")
+}
+
+/// Prism menu → Home. Focus the dashboard when it is already open.
+private struct HomeMenuButton: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button("Home") {
+            AppDelegate.userOpenedHome = true
+            if WindowRouter.focusBookmarksIfVisible() { return }
+            openWindow(id: WindowRouter.bookmarksWindowId)
+        }
+    }
 }

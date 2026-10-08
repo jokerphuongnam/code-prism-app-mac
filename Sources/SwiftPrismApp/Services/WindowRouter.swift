@@ -27,15 +27,22 @@ enum WindowRouter {
     static let bookmarksWindowId = "bookmarks"
     static let projectWindowId = "project"
 
-    /// Bring the single Projects (onboarding) window forward — never spawn a second one.
-    static func focusBookmarks() {
-        if let win = NSApp.windows.first(where: { isBookmarksWindow($0) }) {
-            NSApp.activate(ignoringOtherApps: true)
-            win.makeKeyAndOrderFront(nil)
-            return
+    /// Focus the dashboard when it is already open. Does not create a window.
+    @discardableResult
+    static func focusBookmarksIfVisible() -> Bool {
+        guard let win = NSApp.windows.first(where: { isBookmarksWindow($0) && $0.isVisible }) else {
+            return false
         }
-        // Fall back: ask SwiftUI to present the singular Window.
-        NotificationCenter.default.post(name: .codePrismFocusBookmarks, object: nil)
+        NSApp.activate(ignoringOtherApps: true)
+        win.makeKeyAndOrderFront(nil)
+        return true
+    }
+
+    /// Dismiss the auto-opened dashboard. A project window stays up.
+    static func closeBookmarks() {
+        for win in NSApp.windows where isBookmarksWindow(win) {
+            win.close()
+        }
     }
 
     /// Focus existing project window if open; returns false when caller should `openWindow`.

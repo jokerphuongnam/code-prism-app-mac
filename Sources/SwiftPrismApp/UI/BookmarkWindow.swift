@@ -69,13 +69,18 @@ struct BookmarkWindow: View {
                 openProject(url)
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .codePrismFocusBookmarks)) { _ in
-            openWindow(id: WindowRouter.bookmarksWindowId)
+        .onReceive(NotificationCenter.default.publisher(for: .codePrismOpenLinkedProject)) { note in
+            guard let url = note.object as? URL else { return }
+            AppDelegate.pendingProject = nil
+            openProject(url)
+            dismissHomeIfLinkLaunch()
         }
         .onAppear {
-            // Focus the real Projects window — never close windows (closing can SIGTERM under Xcode).
-            DispatchQueue.main.async {
-                WindowRouter.focusBookmarks()
+            if let url = AppDelegate.pendingProject {
+                AppDelegate.pendingProject = nil
+                AppDelegate.openedFromLink = true
+                openProject(url)
+                dismissHomeIfLinkLaunch()
             }
         }
     }
@@ -95,6 +100,14 @@ struct BookmarkWindow: View {
             Spacer()
         }
         .padding(16)
+    }
+
+    /// The link opened the app, so the automatic dashboard should go away after the project window exists.
+    private func dismissHomeIfLinkLaunch() {
+        guard AppDelegate.openedFromLink, !AppDelegate.userOpenedHome else { return }
+        DispatchQueue.main.async {
+            WindowRouter.closeBookmarks()
+        }
     }
 
     private func openProject(_ url: URL) {

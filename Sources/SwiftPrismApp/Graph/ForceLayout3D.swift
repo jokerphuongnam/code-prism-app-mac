@@ -31,7 +31,8 @@ final class ForceLayout3D {
     func tick(_ steps: Int = 1) -> Float {
         var energy: Float = 0
         for _ in 0..<steps {
-            var forces = Dictionary(uniqueKeysWithValues: ids.map { ($0, SIMD3<Float>.zero) })
+            var forces: [String: SIMD3<Float>] = [:]
+            for id in ids where forces[id] == nil { forces[id] = .zero }
 
             // Charge (repulsion)
             for i in 0..<ids.count {
